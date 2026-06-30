@@ -11,15 +11,21 @@ async def get_request_by_id(req_id: int):
     async with async_session() as session:
         result = await session.execute(select(Request).where(Request.id == req_id))
         return result.scalars().first()
+
+
 async def create_pending_user(data: dict) -> int:
     async with async_session() as session:
+        # Установка системных прав на основе выбранного статуса
+        sys_role = "manager" if data['role_text'] == "Руководитель" else "employee"
+
         new_user = User(
             telegram_id=data['telegram_id'],
             phone=data['phone'],
             full_name=data['full_name'],
             tg_username=data['tg_username'],
-            department=data['department'],
-            position=data['position'],
+            department=data['subdivision'],  # Сохраняем выбранное подразделение
+            position=data['role_text'],  # Сохраняем текстовый статус (Сотрудник/Руководитель)
+            role=sys_role,  # Устанавливаем системную роль
             birth_date=data['birth_date'],
             car_info=data['car_info'],
             face_id_photo=data['face_id_photo'],

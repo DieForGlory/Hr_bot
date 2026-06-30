@@ -1,19 +1,22 @@
-# bot/handlers/auth.py
 from aiogram import Router, F, types
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+
 from bot.utils.db_api import get_user_by_telegram_id, get_user_by_phone, update_user_telegram_id, create_pending_user
 from bot.handlers.main_menu import get_main_keyboard
+from bot.utils.constants import COMPANY_STRUCTURE
+from bot.keyboards.reply import get_structure_kb, get_role_kb
+from bot.utils.routing import send_registration_to_hr
 
 router = Router()
 
 
 class RegistrationState(StatesGroup):
     full_name = State()
-    department = State()
-    position = State()
+    subdivision = State()
+    role_flag = State()
     birth_date = State()
     car_info = State()
     photo = State()
@@ -24,7 +27,7 @@ async def cmd_start(message: types.Message):
     user = await get_user_by_telegram_id(message.from_user.id)
     if user:
         if user.approval_status == "pending":
-            await message.answer("Ваша анкета находится на рассмотрении HR.")
+            await message.answer("Анкета находится на рассмотрении HR.")
         elif user.approval_status == "rejected":
             await message.answer("В регистрации отказано. Обратитесь в отдел кадров.")
         else:
@@ -53,28 +56,32 @@ async def process_contact(message: types.Message, state: FSMContext):
         )
         await message.answer(
             "Сотрудник не найден в базе. Начат процесс регистрации.\n\nВведите ФИО (по паспорту на латинице):",
-            reply_markup=ReplyKeyboardRemove())
+            reply_markup=ReplyKeyboardRemove()
+        )
         await state.set_state(RegistrationState.full_name)
 
 
 @router.message(RegistrationState.full_name)
 async def process_full_name(message: types.Message, state: FSMContext):
     await state.update_data(full_name=message.text)
-    await message.answer("Укажите Управление/Отдел:")
-    await state.set_state(RegistrationState.department)
+    await message.answer(
+        "Выберите ваше подразделение из списка:",
+        reply_markup=get_structure_kb(COMPANY_STRUCTURE)
+    )
+    await state.set_state(RegistrationState.subdivision)
 
 
-@router.message(RegistrationState.department)
-async def process_department(message: types.Message, state: FSMContext):
-    await state.update_data(department=message.text)
-    await message.answer("Укажите должность:")
-    await state.set_state(RegistrationState.position)
+@router.message(RegistrationState.subdivision)
+async def process_subdivision(message: types.Message, state: FSMContext):
+    await state.update_data(subdivision=message.text)
+    await message.answer("Укажите ваш статус:", reply_markup=get_role_kb())
+    await state.set_state(RegistrationState.role_flag)
 
 
-@router.message(RegistrationState.position)
-async def process_position(message: types.Message, state: FSMContext):
-    await state.update_data(position=message.text)
-    await message.answer("Укажите дату рождения (ДД.ММ.ГГГГ):")
+@router.message(RegistrationState.role_flag, F.text.in_(["Сотрудник", "Руководитель"]))
+async def process_role_flag(message: types.Message, state: FSMContext):
+    await state.update_data(role_text=message.text)
+    await message.answer("Укажите дату рождения (ДД.ММ.ГГГГ):", reply_markup=ReplyKeyboardRemove())
     await state.set_state(RegistrationState.birth_date)
 
 
@@ -98,8 +105,6 @@ async def process_photo(message: types.Message, state: FSMContext):
     data = await state.update_data(face_id_photo=photo_id)
 
     user_id = await create_pending_user(data)
-
-    from bot.utils.routing import send_registration_to_hr
     await send_registration_to_hr(message.bot, user_id, data)
 
     await message.answer("Анкета отправлена в HR. Ожидайте уведомления о результатах проверки.")
