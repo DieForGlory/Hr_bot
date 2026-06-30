@@ -6,14 +6,45 @@ from aiogram.types import FSInputFile
 from bot.utils.db_api import get_request_by_id, update_request_status, get_user_by_id, get_users_by_role
 from bot.utils.pdf_gen import generate_vacation_pdf
 from bot.keyboards.inline import get_approval_keyboard
-
+from bot.utils.db_api import update_user_approval, get_user_by_id
 router = Router()
 
 
 class ApprovalState(StatesGroup):
     waiting_for_reject_comment = State()
 
+@router.callback_query(F.data.startswith("reg_approve_"))
+async def process_reg_approve(callback: types.CallbackQuery):
+    user_id = int(callback.data.split("_")[2])
+    await update_user_approval(user_id, "approved")
 
+    user = await get_user_by_id(user_id)
+    if user.telegram_id:
+        from bot.handlers.main_menu import get_main_keyboard
+        await callback.bot.send_message(
+            user.telegram_id,
+            "Ваша учетная запись подтверждена. Доступ к системе открыт.",
+            reply_markup=get_main_keyboard()
+        )
+
+    await callback.message.edit_caption(caption=callback.message.caption + "\n\n✅ Одобрено")
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("reg_reject_"))
+async def process_reg_reject(callback: types.CallbackQuery):
+    user_id = int(callback.data.split("_")[2])
+    await update_user_approval(user_id, "rejected")
+
+    user = await get_user_by_id(user_id)
+    if user.telegram_id:
+        await callback.bot.send_message(
+            user.telegram_id,
+            "В регистрации отказано."
+        )
+
+    await callback.message.edit_caption(caption=callback.message.caption + "\n\n❌ Отклонено")
+    await callback.answer()
 @router.callback_query(F.data.startswith("approve_"))
 async def process_approve(callback: types.CallbackQuery):
     req_id = int(callback.data.split("_")[1])

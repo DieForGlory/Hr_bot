@@ -2,7 +2,35 @@
 from aiogram import Bot
 from bot.keyboards.inline import get_approval_keyboard
 from bot.utils.db_api import get_user_by_id, get_users_by_role
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from bot.utils.db_api import get_users_by_role
+async def send_registration_to_hr(bot, user_id: int, data: dict):
+    hr_users = await get_users_by_role("hr")
 
+    text = (
+        f"Новая заявка на регистрацию:\n"
+        f"ФИО: {data['full_name']}\n"
+        f"Отдел: {data['department']}\n"
+        f"Должность: {data['position']}\n"
+        f"Телефон: {data['phone']}\n"
+        f"Username: @{data['tg_username']}\n"
+        f"Дата рождения: {data['birth_date']}\n"
+        f"Авто: {data['car_info']}"
+    )
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Одобрить", callback_data=f"reg_approve_{user_id}")],
+        [InlineKeyboardButton(text="Отклонить", callback_data=f"reg_reject_{user_id}")]
+    ])
+
+    for hr in hr_users:
+        if hr.telegram_id:
+            await bot.send_photo(
+                chat_id=hr.telegram_id,
+                photo=data['face_id_photo'],
+                caption=text,
+                reply_markup=kb
+            )
 
 async def notify_manager(bot: Bot, employee, req_id: int, data: dict):
     if not employee.manager_id:

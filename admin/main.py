@@ -1,21 +1,33 @@
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-import secrets
+# admin/main.py
+from fastapi import FastAPI, Request as FastAPIRequest, Depends
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from db.database import engine, Base, get_db
+from db.models import User, Request as HRRequest, DocumentTemplate, CalendarDay
 
 app = FastAPI(title="HR Bot Admin Panel")
-security = HTTPBasic()
+templates = Jinja2Templates(directory="admin/templates")
 
-# В реальности храните это в .env
-ADMIN_USER = "hr_manager"
-ADMIN_PASS = "secure_password_123"
 
-def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
-    correct_username = secrets.compare_digest(credentials.username, ADMIN_USER)
-    correct_password = secrets.compare_digest(credentials.password, ADMIN_PASS)
-    if not (correct_username and correct_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect credentials",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    return credentials.username
+@app.on_event("startup")
+async def startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+
+@app.get("/")
+async def dashboard(request: FastAPIRequest, db: AsyncSession = Depends(get_db)):
+    users = (await db.execute(select(User))).scalars().all()
+    requests_data = (await db.execute(select(HRRequest))).scalars().all()
+    templates_data = (await db.execute(select(DocumentTemplate))).scalars().all()
+    calendar_data = (await db.execute(select(CalendarDay).order_by(CalendarDay.date))).scalars().all()
+
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "users": users,
+        "requests": requests_data,
+        "templates": templates_data,
+        "calendar": calendar_data
+    })

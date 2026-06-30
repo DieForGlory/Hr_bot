@@ -3,17 +3,42 @@ from sqlalchemy.future import select
 from sqlalchemy import update
 from db.database import async_session
 from db.models import User, Request
-from sqlalchemy import update
 from db.database import async_session
-from db.models import User
 from sqlalchemy.future import select
-from sqlalchemy import update
+from sqlalchemy import insert, update
 
 async def get_request_by_id(req_id: int):
     async with async_session() as session:
         result = await session.execute(select(Request).where(Request.id == req_id))
         return result.scalars().first()
+async def create_pending_user(data: dict) -> int:
+    async with async_session() as session:
+        new_user = User(
+            telegram_id=data['telegram_id'],
+            phone=data['phone'],
+            full_name=data['full_name'],
+            tg_username=data['tg_username'],
+            department=data['department'],
+            position=data['position'],
+            birth_date=data['birth_date'],
+            car_info=data['car_info'],
+            face_id_photo=data['face_id_photo'],
+            approval_status="pending",
+            is_active=False
+        )
+        session.add(new_user)
+        await session.commit()
+        return new_user.id
 
+async def update_user_approval(user_id: int, status: str):
+    async with async_session() as session:
+        is_active = True if status == "approved" else False
+        await session.execute(
+            update(User)
+            .where(User.id == user_id)
+            .values(approval_status=status, is_active=is_active)
+        )
+        await session.commit()
 async def update_request_status(req_id: int, status: str, hr_comment: str = None):
     async with async_session() as session:
         values = {"status": status}
