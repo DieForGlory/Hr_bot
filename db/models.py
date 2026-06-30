@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, BigInteger, String, Boolean, Date, ForeignKey, DateTime, func
 from db.database import Base
-
+from sqlalchemy import Column, Integer, Date, Boolean
 
 class User(Base):
     __tablename__ = "users"
@@ -21,6 +21,15 @@ class User(Base):
     car_info = Column(String, nullable=True)
     face_id_photo = Column(String, nullable=True)
     approval_status = Column(String, default="approved")
+
+
+class CalendarDay(Base):
+    __tablename__ = "calendar"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, unique=True, nullable=False)
+    is_workday = Column(Boolean, default=False)
+    description = Column(String, nullable=True)
 
 class Request(Base):
     __tablename__ = "requests"
