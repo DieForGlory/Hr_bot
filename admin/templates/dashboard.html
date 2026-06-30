@@ -1,0 +1,61 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>HR Bot Admin Panel</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 30px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Панель управления HR</h1>
+
+    <h2>Сотрудники</h2>
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Telegram ID</th>
+            <th>ФИО</th>
+            <th>Роль</th>
+            <th>Баланс отпуска</th>
+            <th>Активен</th>
+        </tr>
+        {% for u in users %}
+        <tr>
+            <td>{{ u.id }}</td>
+            <td>{{ u.telegram_id }}</td>
+            <td>{{ u.full_name }}</td>
+            <td>{{ u.role }}</td>
+            <td>{{ u.vacation_days_balance }}</td>
+            <td>{{ u.is_active }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h2>Заявки</h2>
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Тип</th>
+            <th>Статус</th>
+            <th>Сотрудник (ID)</th>
+            <th>Даты</th>
+            <th>Комментарий</th>
+        </tr>
+        {% for r in requests %}
+        <tr>
+            <td>{{ r.id }}</td>
+            <td>{{ r.type }}</td>
+            <td>{{ r.status }}</td>
+            <td>{{ r.user_id }}</td>
+            <td>{{ r.start_date }} - {{ r.end_date }}</td>
+            <td>{{ r.comment }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
