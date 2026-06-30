@@ -1,30 +1,13 @@
-from fastapi import FastAPI, Request as FastAPIRequest, Depends
-from fastapi.templating import Jinja2Templates
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from db.database import engine, Base, get_db
-from db.models import User, Request as HRRequest
+# admin/main.py (Дополнение для защиты)
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
-app = FastAPI(title="HR Bot Admin Panel")
-templates = Jinja2Templates(directory="admin/templates")
+security = HTTPBasic()
 
-
-@app.on_event("startup")
-async def startup():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-
-@app.get("/")
-async def dashboard(request: FastAPIRequest, db: AsyncSession = Depends(get_db)):
-    result_users = await db.execute(select(User))
-    users = result_users.scalars().all()
-
-    result_reqs = await db.execute(select(HRRequest))
-    requests = result_reqs.scalars().all()
-
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
-        "users": users,
-        "requests": requests
-    })
+def verify_hr_access(credentials: HTTPBasicCredentials = Depends(security)):
+    if credentials.username != "admin" or credentials.password != "secure_password":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password"
+        )
+    return credentials.username
