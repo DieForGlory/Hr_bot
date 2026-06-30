@@ -3,6 +3,30 @@ from sqlalchemy.future import select
 from sqlalchemy import update
 from db.database import async_session
 from db.models import User, Request
+from sqlalchemy import update
+from db.database import async_session
+from db.models import User
+from sqlalchemy.future import select
+
+async def get_user_by_id(user_id: int):
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.id == user_id))
+        return result.scalars().first()
+
+async def get_users_by_role(role: str):
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.role == role))
+        return result.scalars().all()
+
+async def get_user_by_phone(phone: str):
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.phone.like(f"%{phone[-10:]}%")))
+        return result.scalars().first()
+
+async def update_user_telegram_id(user_id: int, telegram_id: int):
+    async with async_session() as session:
+        await session.execute(update(User).where(User.id == user_id).values(telegram_id=telegram_id))
+        await session.commit()
 
 async def get_user_by_telegram_id(telegram_id: int):
     async with async_session() as session:

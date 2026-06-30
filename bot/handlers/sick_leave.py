@@ -1,12 +1,12 @@
+# bot/handlers/sick_leave.py
 import asyncio
-from datetime import datetime
 from aiogram import Router, F, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import ReplyKeyboardRemove
+from aiogram.types import CallbackQuery
+from aiogram3_calendar import SimpleCalendar, simple_cal_callback
 from bot.utils.db_api import get_user_by_telegram_id, create_request
 from bot.utils.scheduler import schedule_sick_leave_reminder
-from bot.handlers.main_menu import get_main_keyboard
 
 router = Router()
 
@@ -16,33 +16,24 @@ class SickLeaveState(StatesGroup):
     waiting_for_document = State()
 
 
-@router.message(F.text == "Больничный")
+@router.message(F.text == "🏥 Больничный")
 async def start_sick_leave(message: types.Message, state: FSMContext):
-    await message.answer("Укажите дату начала больничного (ГГГГ-ММ-ДД):", reply_markup=ReplyKeyboardRemove())
+    await message.answer(
+        "Выберите дату начала больничного:",
+        reply_markup=await SimpleCalendar().start_calendar()
+    )
     await state.set_state(SickLeaveState.waiting_for_start_date)
 
 
-@router.message(SickLeaveState.waiting_for_start_date)
-async def process_sick_leave_start(message: types.Message, state: FSMContext):
-    try:
-        start_date = datetime.strptime(message.text, "%Y-%m-%d").date()
-    except ValueError:
-        await message.answer("Неверный формат. Используйте ГГГГ-ММ-ДД.")
-        return
+@router.callback_query(SimpleCalendar.filter(), SickLeaveState.waiting_for_start_date)
+async def process_sick_leave_start(callback: CallbackQuery, callback_data: dict, state: FSMContext):
+    selected, date = await SimpleCalendar().process_selection(callback, callback_data)
+    if selected:
+        user = await get_user_by_telegram_id(callback.from_user.id)
+        if user:
+            await create_request(user.id, "sick_leave", start_date=date)
 
-    user = await get_user_by_telegram_id(message.from_user.id)
-    if user:
-        await create_request(user.id, "sick_leave", start_date=start_date)
+        await callback.message.answer("После завершения больничного не забудьте прикрепить подтверждающий документ.")
+        await state.set_state(SickLeaveState.waiting_for_document)
 
-    await message.answer("После завершения больничного не забудьте прикрепить подтверждающий документ.")
-    await state.set_state(SickLeaveState.waiting_for_document)
-
-    asyncio.create_task(schedule_sick_leave_reminder(message.bot, message.chat.id))
-
-    await message.answer("Главное меню", reply_markup=get_main_keyboard())
-
-
-@router.message(SickLeaveState.waiting_for_document, F.document | F.photo)
-async def process_sick_leave_document(message: types.Message, state: FSMContext):
-    await message.answer("Документ успешно загружен. Заявка обновлена.")
-    await state.clear()
+        asyncio.create_task(schedule_sick_leave_reminder(callback.bot, callback.message.chat.id))
