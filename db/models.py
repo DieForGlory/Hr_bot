@@ -45,6 +45,12 @@ class Request(Base):
     file_path = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
+class DocumentTemplate(Base):
+    __tablename__ = "templates"
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    file_path = Column(String, nullable=False)
+
 class FAQ(Base):
     __tablename__ = "faq"
     id = Column(Integer, primary_key=True, autoincrement=True)

@@ -7,7 +7,12 @@ from aiogram3_calendar import SimpleCalendar, simple_cal_callback
 from bot.utils.db_api import get_user_by_telegram_id, create_request
 from bot.handlers.main_menu import get_main_keyboard
 from bot.utils.db_api import calculate_actual_vacation_days
-from aiogram3_calendar import SimpleCalendarCallback
+from aiogram3_calendar import SimpleCalendar
+from aiogram.filters import Filter
+from aiogram.types import CallbackQuery
+from aiogram3_calendar import SimpleCalendar
+from aiogram3_calendar import SimpleCalendar
+from aiogram import F, types
 router = Router()
 
 
@@ -43,9 +48,9 @@ async def start_vacation_request(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-@router.callback_query(SimpleCalendarCallback.filter(), VacationState.waiting_for_start_date)
-async def process_start_date(callback: types.CallbackQuery, callback_data: SimpleCalendarCallback, state: FSMContext):
-    selected, date = await SimpleCalendar().process_selection(callback, callback_data)
+@router.callback_query(F.data.startswith("simple_calendar"), VacationState.waiting_for_start_date)
+async def process_start_date(callback: CallbackQuery, state: FSMContext):
+    selected, date = await SimpleCalendar().process_selection(callback, callback.data)
     if selected:
         await state.update_data(start_date=date)
         await callback.message.answer(
