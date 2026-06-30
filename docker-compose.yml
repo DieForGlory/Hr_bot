@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    volumes:
+      - db_data:/app/data
+      - assets_data:/app/assets
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.admin
+    ports:
+      - "8000:8000"
+    volumes:
+      - db_data:/app/data
+      - assets_data:/app/assets
+    env_file:
+      - .env
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  assets_data:

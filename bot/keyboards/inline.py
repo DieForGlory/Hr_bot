@@ -20,6 +20,17 @@ def get_confirm_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="Отмена", callback_data="cancel_action")]
     ])
 
+def get_faq_list_kb(faqs) -> InlineKeyboardMarkup:
+    kb = []
+    for faq in faqs:
+        kb.append([InlineKeyboardButton(text=faq.question, callback_data=f"faq_{faq.id}")])
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+def get_faq_back_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Назад к списку вопросов", callback_data="faq_back")]
+    ])
+
 def get_faq_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Аванс и ЗП", callback_data="faq_salary")],

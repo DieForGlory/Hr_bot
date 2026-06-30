@@ -6,7 +6,7 @@ from aiogram.types import CallbackQuery
 from aiogram3_calendar import SimpleCalendar, simple_cal_callback
 from bot.utils.db_api import get_user_by_telegram_id, create_request
 from bot.handlers.main_menu import get_main_keyboard
-
+from bot.utils.db_api import calculate_actual_vacation_days
 router = Router()
 
 
@@ -58,22 +58,30 @@ async def process_start_date(callback: CallbackQuery, callback_data: dict, state
 async def process_end_date(callback: CallbackQuery, callback_data: dict, state: FSMContext):
     selected, end_date = await SimpleCalendar().process_selection(callback, callback_data)
     if selected:
-        data = await state.update_data(end_date=end_date)
+        data = await state.get_data()
         start_date = data['start_date']
 
-        days_count = (end_date - start_date).days + 1
-        if days_count <= 0:
-            await callback.message.answer("Дата окончания должна быть позже даты начала.")
+        if end_date < start_date:
+            await callback.message.answer("Дата окончания не может быть раньше даты начала.")
             return
 
-        if data['vacation_type'] == 'paid' and days_count > data['balance']:
-            await callback.message.answer(f"Запрошено {days_count} дней. Доступно только {data['balance']}.")
+        # Расчет дней с учетом производственного календаря
+        actual_days = await calculate_actual_vacation_days(start_date, end_date)
+
+        if actual_days <= 0:
+            await callback.message.answer("Выбранный период содержит только нерабочие дни.")
             return
+
+        if data['vacation_type'] == 'paid' and actual_days > data['balance']:
+            await callback.message.answer(f"Запрошено {actual_days} дней. Доступно только {data['balance']}.")
+            return
+
+        await state.update_data(end_date=end_date, days_count=actual_days)
 
         from bot.keyboards.inline import get_confirm_kb
         await callback.message.answer(
             f"Подтверждение:\nПериод: {start_date.strftime('%d.%m.%Y')} - {end_date.strftime('%d.%m.%Y')}\n"
-            f"Количество дней: {days_count}",
+            f"Количество списываемых дней: {actual_days}",
             reply_markup=get_confirm_kb()
         )
 

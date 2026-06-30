@@ -7,6 +7,13 @@ from bot.utils.db_api import get_request_by_id, update_request_status, get_user_
 from bot.utils.pdf_gen import generate_vacation_pdf
 from bot.keyboards.inline import get_approval_keyboard
 from bot.utils.db_api import update_user_approval, get_user_by_id
+from aiogram import Router, F, types
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import FSInputFile
+from bot.utils.db_api import get_request_by_id, update_request_status, get_user_by_id, get_users_by_role
+from bot.utils.pdf_gen import generate_vacation_pdf
+from bot.keyboards.inline import get_approval_keyboard
 router = Router()
 
 
@@ -46,6 +53,7 @@ async def process_reg_reject(callback: types.CallbackQuery):
     await callback.message.edit_caption(caption=callback.message.caption + "\n\n❌ Отклонено")
     await callback.answer()
 @router.callback_query(F.data.startswith("approve_"))
+@router.callback_query(F.data.startswith("approve_"))
 async def process_approve(callback: types.CallbackQuery):
     req_id = int(callback.data.split("_")[1])
     req = await get_request_by_id(req_id)
@@ -68,7 +76,8 @@ async def process_approve(callback: types.CallbackQuery):
         await update_request_status(req_id, "hr_approved")
         await callback.message.edit_text(callback.message.text + "\n\n✅ Согласовано HR.")
 
-        pdf_path = generate_vacation_pdf(req.id, employee.full_name, req.start_date, req.end_date, req.type)
+        # Асинхронный вызов генератора
+        pdf_path = await generate_vacation_pdf(req.id, employee.full_name, req.start_date, req.end_date, req.type)
 
         if employee.telegram_id:
             await callback.bot.send_message(

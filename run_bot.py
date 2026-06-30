@@ -4,7 +4,9 @@ import logging
 from aiogram import Bot, Dispatcher
 from core.config import BOT_TOKEN
 from db.database import engine, Base
-from bot.handlers import auth, main_menu, vacation, certificates, sick_leave, approvals
+from bot.handlers import auth, main_menu, vacation, certificates, sick_leave, approvals, hr_question
+from bot.handlers import settings
+from bot.utils.scheduler import setup_scheduler
 
 async def init_db():
     async with engine.begin() as conn:
@@ -24,8 +26,11 @@ async def main():
     dp.include_router(sick_leave.router)
     dp.include_router(auth.router)
     dp.include_router(approvals.router)
+    dp.include_router(settings.router)
+    dp.include_router(hr_question.router)
     await dp.start_polling(bot)
-
+    scheduler = setup_scheduler(bot)
+    scheduler.start()
 
 if __name__ == "__main__":
     asyncio.run(main())

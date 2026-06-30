@@ -12,7 +12,7 @@ class User(Base):
     manager_id = Column(Integer, nullable=True)
     vacation_days_balance = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
-
+    language = Column(String, default="ru")
     # Новые поля анкеты
     department = Column(String, nullable=True)
     position = Column(String, nullable=True)

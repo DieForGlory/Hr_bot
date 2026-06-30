@@ -6,6 +6,9 @@ from db.models import User, Request
 from db.database import async_session
 from sqlalchemy.future import select
 from sqlalchemy import insert, update
+from db.models import FAQ
+from sqlalchemy import select, and_
+from db.models import CalendarDay
 
 async def get_request_by_id(req_id: int):
     async with async_session() as session:
@@ -90,6 +93,35 @@ async def create_request(user_id: int, req_type: str, start_date=None, end_date=
         session.add(new_req)
         await session.commit()
         return new_req.id
+
+
+async def calculate_actual_vacation_days(start_date, end_date) -> int:
+    total_calendar_days = (end_date - start_date).days + 1
+
+    async with async_session() as session:
+        result = await session.execute(
+            select(CalendarDay).where(
+                and_(
+                    CalendarDay.date >= start_date,
+                    CalendarDay.date <= end_date,
+                    CalendarDay.is_workday == False
+                )
+            )
+        )
+        holidays_count = len(result.scalars().all())
+
+    # Исключение зафиксированных праздничных дней из общего количества дней отпуска
+    return total_calendar_days - holidays_count
+
+async def get_all_faqs():
+    async with async_session() as session:
+        result = await session.execute(select(FAQ))
+        return result.scalars().all()
+
+async def get_faq_by_id(faq_id: int):
+    async with async_session() as session:
+        result = await session.execute(select(FAQ).where(FAQ.id == faq_id))
+        return result.scalars().first()
 
 async def get_user_requests(user_id: int):
     async with async_session() as session:
