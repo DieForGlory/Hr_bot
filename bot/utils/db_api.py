@@ -7,6 +7,20 @@ from sqlalchemy import update
 from db.database import async_session
 from db.models import User
 from sqlalchemy.future import select
+from sqlalchemy import update
+
+async def get_request_by_id(req_id: int):
+    async with async_session() as session:
+        result = await session.execute(select(Request).where(Request.id == req_id))
+        return result.scalars().first()
+
+async def update_request_status(req_id: int, status: str, hr_comment: str = None):
+    async with async_session() as session:
+        values = {"status": status}
+        if hr_comment:
+            values["hr_comment"] = hr_comment
+        await session.execute(update(Request).where(Request.id == req_id).values(**values))
+        await session.commit()
 
 async def get_user_by_id(user_id: int):
     async with async_session() as session:

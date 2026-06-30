@@ -4,7 +4,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from core.config import BOT_TOKEN
 from db.database import engine, Base
-from bot.handlers import auth, main_menu, vacation, certificates, sick_leave
+from bot.handlers import auth, main_menu, vacation, certificates, sick_leave, approvals
 
 async def init_db():
     async with engine.begin() as conn:
@@ -23,6 +23,7 @@ async def main():
     dp.include_router(certificates.router)
     dp.include_router(sick_leave.router)
     dp.include_router(auth.router)
+    dp.include_router(approvals.router)
     await dp.start_polling(bot)
 
 
