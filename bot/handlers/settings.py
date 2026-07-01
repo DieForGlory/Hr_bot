@@ -5,6 +5,7 @@ from bot.locales.texts import get_text
 from sqlalchemy import update
 from db.database import async_session
 from db.models import User
+from aiogram.filters import Command
 
 router = Router()
 

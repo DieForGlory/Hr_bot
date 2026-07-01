@@ -6,10 +6,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from db.database import engine, Base, get_db
 from db.models import User, Request as HRRequest, DocumentTemplate, CalendarDay
+import logging
 
 app = FastAPI(title="HR Bot Admin Panel")
 templates = Jinja2Templates(directory="admin/templates")
 
+
+class EndpointFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.getMessage().find("/api/turbo") == -1
+
+logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 
 @app.on_event("startup")
 async def startup():

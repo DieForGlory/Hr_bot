@@ -60,9 +60,9 @@ async def process_start_date(callback: CallbackQuery, state: FSMContext):
         await state.set_state(VacationState.waiting_for_end_date)
 
 
-@router.callback_query(SimpleCalendar.filter(), VacationState.waiting_for_end_date)
-async def process_end_date(callback: CallbackQuery, callback_data: dict, state: FSMContext):
-    selected, end_date = await SimpleCalendar().process_selection(callback, callback_data)
+@router.callback_query(F.data.startswith("simple_calendar"), VacationState.waiting_for_end_date)
+async def process_end_date(callback: types.CallbackQuery, state: FSMContext):
+    selected, end_date = await SimpleCalendar().process_selection(callback, callback.data)
     if selected:
         data = await state.get_data()
         start_date = data['start_date']

@@ -1,4 +1,4 @@
-
+import ssl
 import asyncio
 import logging
 from aiogram import Bot, Dispatcher
@@ -8,6 +8,7 @@ from bot.handlers import auth, main_menu, vacation, certificates, sick_leave, ap
 from bot.handlers import settings
 from bot.utils.scheduler import setup_scheduler
 
+ssl._create_default_https_context = ssl._create_unverified_context
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

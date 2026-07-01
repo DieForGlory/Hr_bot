@@ -25,9 +25,9 @@ async def start_sick_leave(message: types.Message, state: FSMContext):
     await state.set_state(SickLeaveState.waiting_for_start_date)
 
 
-@router.callback_query(SimpleCalendar.filter(), SickLeaveState.waiting_for_start_date)
-async def process_sick_leave_start(callback: CallbackQuery, callback_data: dict, state: FSMContext):
-    selected, date = await SimpleCalendar().process_selection(callback, callback_data)
+@router.callback_query(F.data.startswith("calendar_"), SickLeaveState.waiting_for_start_date)
+async def process_start_date(callback: types.CallbackQuery, state: FSMContext):
+    selected, date = await SimpleCalendar().process_selection(callback, callback.data)
     if selected:
         user = await get_user_by_telegram_id(callback.from_user.id)
         if user:
