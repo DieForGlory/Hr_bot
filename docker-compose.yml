@@ -1,7 +1,7 @@
 services:
   bot:
     build: .
-    command: python run_bot.py
+    command: sh -c "python scripts/import_structure.py && python run_bot.py"
     volumes:
       - ./data:/app/data
       - ./assets:/app/assets
