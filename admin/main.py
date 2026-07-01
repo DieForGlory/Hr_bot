@@ -1,40 +1,72 @@
-# admin/main.py
-from fastapi import FastAPI, Request as FastAPIRequest, Depends
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from db.database import engine, Base, get_db
+import ssl
+import aiohttp
+from fastapi import FastAPI
+from sqladmin import Admin, ModelView
+from aiogram import Bot
+from aiogram.client.session.aiohttp import AiohttpSession
+
+from db.database import engine
 from db.models import User, Request as HRRequest, DocumentTemplate, CalendarDay
-import logging
+from core.config import BOT_TOKEN
 
-app = FastAPI(title="HR Bot Admin Panel")
-templates = Jinja2Templates(directory="admin/templates")
+# Инициализация FastAPI
+app = FastAPI(title="HR Bot Admin")
 
+# Интеграция бота для уведомлений (с обходом SSL)
+ssl_context = ssl.create_default_context()
+ssl_context.check_hostname = False
+ssl_context.verify_mode = ssl.CERT_NONE
+connector = aiohttp.TCPConnector(ssl=ssl_context)
+session = AiohttpSession()
 
-class EndpointFilter(logging.Filter):
-    def filter(self, record: logging.LogRecord) -> bool:
-        return record.getMessage().find("/api/turbo") == -1
+async def create_client_session():
+    return aiohttp.ClientSession(connector=connector)
+session._create_client_session = create_client_session
 
-logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
+bot = Bot(token=BOT_TOKEN, session=session)
 
-@app.on_event("startup")
-async def startup():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+# Инициализация SQLAdmin
+admin = Admin(app, engine, title="Управление HR Bot")
 
+class UserAdmin(ModelView, model=User):
+    column_list = [User.id, User.telegram_id, User.full_name, User.role, User.department, User.position, User.is_active]
+    column_searchable_list = [User.full_name, User.telegram_id]
+    column_sortable_list = [User.id, User.full_name]
+    name = "Сотрудник"
+    name_plural = "Сотрудники"
+    icon = "fa-solid fa-users"
 
-@app.get("/")
-async def dashboard(request: FastAPIRequest, db: AsyncSession = Depends(get_db)):
-    users = (await db.execute(select(User))).scalars().all()
-    requests_data = (await db.execute(select(HRRequest))).scalars().all()
-    templates_data = (await db.execute(select(DocumentTemplate))).scalars().all()
-    calendar_data = (await db.execute(select(CalendarDay).order_by(CalendarDay.date))).scalars().all()
+class RequestAdmin(ModelView, model=HRRequest):
+    column_list = [HRRequest.id, HRRequest.user_id, HRRequest.status]
+    column_searchable_list = [HRRequest.status]
+    name = "Заявка"
+    name_plural = "Заявки"
+    icon = "fa-solid fa-envelope"
 
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
-        "users": users,
-        "requests": requests_data,
-        "templates": templates_data,
-        "calendar": calendar_data
-    })
+    async def on_model_change(self, data, model, is_created, request):
+        if not is_created and "status" in data:
+            try:
+                await bot.send_message(
+                    chat_id=model.user_id,
+                    text=f"Статус вашей заявки изменен: {data['status']}"
+                )
+            except Exception as e:
+                print(f"Ошибка отправки уведомления: {e}")
+
+class DocumentTemplateAdmin(ModelView, model=DocumentTemplate):
+    column_list = [DocumentTemplate.id, DocumentTemplate.name, DocumentTemplate.file_path]
+    name = "Шаблон"
+    name_plural = "Шаблоны документов"
+    icon = "fa-solid fa-file-word"
+
+class CalendarDayAdmin(ModelView, model=CalendarDay):
+    column_list = [CalendarDay.id, CalendarDay.date, CalendarDay.is_workday]
+    name = "День календаря"
+    name_plural = "Производственный календарь"
+    icon = "fa-solid fa-calendar-days"
+
+# Регистрация представлений
+admin.add_view(UserAdmin)
+admin.add_view(RequestAdmin)
+admin.add_view(DocumentTemplateAdmin)
+admin.add_view(CalendarDayAdmin)
