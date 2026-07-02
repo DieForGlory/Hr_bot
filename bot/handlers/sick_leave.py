@@ -10,7 +10,7 @@ from bot.utils.db_api import (
 )
 from bot.utils.scheduler import schedule_sick_leave_reminder
 from bot.utils.validators import to_date, is_valid_sick_leave_start
-from bot.locales.texts import get_text
+from bot.locales.texts import get_text, get_text_variants
 from core.logging_config import action_logger
 
 router = Router()
@@ -21,7 +21,7 @@ class SickLeaveState(StatesGroup):
     waiting_for_document = State()
 
 
-@router.message(F.text == "🏥 Больничный")
+@router.message(F.text.in_(get_text_variants("sick_leave")))
 async def start_sick_leave(message: types.Message, state: FSMContext):
     user = await get_user_by_telegram_id(message.from_user.id)
     lang = user.language if user else "ru"
@@ -69,9 +69,9 @@ async def _attach_and_forward(message: types.Message, user, req_id: int, lang: s
     action_logger.info("sick_leave_document_attached user_id=%s req_id=%s", user.id, req_id)
 
     hr_users = await get_users_by_role("hr")
-    caption = f"Подтверждающий документ по больничному от {user.full_name}"
     for hr in hr_users:
         if hr.telegram_id:
+            caption = get_text("sick_leave_doc_forward_caption", hr.language).format(full_name=user.full_name)
             if message.document:
                 await message.bot.send_document(hr.telegram_id, message.document.file_id, caption=caption)
             else:

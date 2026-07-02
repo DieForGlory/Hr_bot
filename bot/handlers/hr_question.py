@@ -4,7 +4,7 @@ from aiogram.fsm.state import State, StatesGroup
 from bot.utils.db_api import get_users_by_role, get_user_by_telegram_id, get_user_by_id
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from bot.utils.validators import parse_callback_id, clean_text, MAX_QUESTION_LEN
-from bot.locales.texts import get_text
+from bot.locales.texts import get_text, get_text_variants
 from core.logging_config import action_logger
 
 router = Router()
@@ -15,7 +15,7 @@ class HRQuestionState(StatesGroup):
     waiting_for_reply = State()
 
 
-@router.message(F.text == "Вопрос HR")
+@router.message(F.text.in_(get_text_variants("hr_question")))
 async def ask_hr_start(message: types.Message, state: FSMContext):
     user = await get_user_by_telegram_id(message.from_user.id)
     lang = user.language if user else "ru"
@@ -37,14 +37,14 @@ async def process_question(message: types.Message, state: FSMContext):
 
     hr_users = await get_users_by_role("hr")
 
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Ответить", callback_data=f"hr_reply_{user.id}")]
-    ])
-
-    text = f"❓ Вопрос от {user.full_name} ({user.department}):\n\n{question}"
-
     for hr in hr_users:
         if hr.telegram_id:
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text=get_text("hr_reply_button", hr.language), callback_data=f"hr_reply_{user.id}")]
+            ])
+            text = get_text("hr_question_header", hr.language).format(
+                name=user.full_name, department=user.department, question=question
+            )
             await message.bot.send_message(hr.telegram_id, text, reply_markup=kb)
 
     action_logger.info("hr_question_asked user_id=%s", user.id)
@@ -66,17 +66,23 @@ async def process_hr_reply_start(callback: types.CallbackQuery, state: FSMContex
         await callback.answer()
         return
 
+    actor = await get_user_by_telegram_id(callback.from_user.id)
+    actor_lang = actor.language if actor else "ru"
+
     await state.update_data(target_user_id=target_user_id)
-    await callback.message.answer("Введите текст ответа:")
+    await callback.message.answer(get_text("hr_reply_prompt", actor_lang))
     await state.set_state(HRQuestionState.waiting_for_reply)
     await callback.answer()
 
 
 @router.message(HRQuestionState.waiting_for_reply, F.text)
 async def process_hr_reply(message: types.Message, state: FSMContext):
+    actor = await get_user_by_telegram_id(message.from_user.id)
+    actor_lang = actor.language if actor else "ru"
+
     reply = clean_text(message.text, MAX_QUESTION_LEN)
     if reply is None:
-        await message.answer(get_text("text_too_long", "ru"))
+        await message.answer(get_text("text_too_long", actor_lang))
         return
 
     data = await state.get_data()
@@ -86,16 +92,18 @@ async def process_hr_reply(message: types.Message, state: FSMContext):
     if target_user and target_user.telegram_id:
         await message.bot.send_message(
             target_user.telegram_id,
-            f"Ответ от HR:\n\n{reply}"
+            get_text("hr_answer_prefix", target_user.language).format(reply=reply)
         )
         action_logger.info("hr_question_answered target_user_id=%s", target_user.id)
-        await message.answer("Ответ отправлен сотруднику.")
+        await message.answer(get_text("hr_reply_sent_confirm", actor_lang))
     else:
-        await message.answer("Ошибка: сотрудник не найден или не авторизован.")
+        await message.answer(get_text("hr_reply_error", actor_lang))
 
     await state.clear()
 
 
 @router.message(HRQuestionState.waiting_for_reply)
 async def process_hr_reply_invalid(message: types.Message):
-    await message.answer(get_text("only_text_allowed", "ru"))
+    user = await get_user_by_telegram_id(message.from_user.id)
+    lang = user.language if user else "ru"
+    await message.answer(get_text("only_text_allowed", lang))

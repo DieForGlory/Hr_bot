@@ -8,6 +8,5 @@ python-dotenv==1.0.1
 aiogram3-calendar==0.1.2
 apscheduler==3.10.4
 fpdf2
-sqladmin
 itsdangerous
 python-multipart

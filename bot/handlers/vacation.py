@@ -6,7 +6,7 @@ from aiogram3_calendar import SimpleCalendar, simple_cal_callback
 from bot.utils.db_api import get_user_by_telegram_id, create_request, calculate_actual_vacation_days
 from bot.handlers.main_menu import get_main_keyboard
 from bot.utils.validators import to_date, is_valid_vacation_start
-from bot.locales.texts import get_text
+from bot.locales.texts import get_text, get_text_variants
 from core.logging_config import action_logger
 
 router = Router()
@@ -17,12 +17,12 @@ class VacationState(StatesGroup):
     waiting_for_end_date = State()
 
 
-@router.message(F.text == "📄 Отпуск")
+@router.message(F.text.in_(get_text_variants("vacation")))
 async def vacation_menu(message: types.Message):
     user = await get_user_by_telegram_id(message.from_user.id)
     lang = user.language if user else "ru"
     from bot.keyboards.inline import get_vacation_types_kb
-    await message.answer(get_text("vacation_choose_type", lang), reply_markup=get_vacation_types_kb())
+    await message.answer(get_text("vacation_choose_type", lang), reply_markup=get_vacation_types_kb(lang))
 
 
 @router.callback_query(F.data.startswith("vac_type_"))
@@ -44,7 +44,7 @@ async def start_vacation_request(callback: CallbackQuery, state: FSMContext):
             await callback.answer()
             return
         # Показываем остаток отпускных дней перед подачей заявки
-        await callback.message.answer(f"Ваш остаток отпускных дней: {user.vacation_days_balance}")
+        await callback.message.answer(get_text("vacation_balance_info", lang).format(balance=user.vacation_days_balance))
 
     await state.update_data(vacation_type=vac_type, balance=user.vacation_days_balance)
     await callback.message.answer(
@@ -114,8 +114,7 @@ async def process_end_date(callback: types.CallbackQuery, callback_data: simple_
 
     if data['vacation_type'] == 'paid' and actual_days > data['balance']:
         await callback.message.answer(
-            f"Запрошено {actual_days} дней. Доступно только {data['balance']}.\n"
-            f"Выберите дату окончания заново:",
+            get_text("vacation_over_balance", lang).format(days=actual_days, balance=data['balance']),
             reply_markup=await SimpleCalendar().start_calendar()
         )
         return
@@ -124,9 +123,10 @@ async def process_end_date(callback: types.CallbackQuery, callback_data: simple_
 
     from bot.keyboards.inline import get_confirm_kb
     await callback.message.answer(
-        f"Подтверждение:\nПериод: {start_date.strftime('%d.%m.%Y')} - {end_date.strftime('%d.%m.%Y')}\n"
-        f"Количество списываемых дней: {actual_days}",
-        reply_markup=get_confirm_kb()
+        get_text("vacation_confirmation_summary", lang).format(
+            start=start_date.strftime('%d.%m.%Y'), end=end_date.strftime('%d.%m.%Y'), days=actual_days
+        ),
+        reply_markup=get_confirm_kb(lang)
     )
 
 

@@ -20,6 +20,9 @@ class User(Base):
     car_info = Column(String, nullable=True)
     face_id_photo = Column(String, nullable=True)
     approval_status = Column(String, default="approved")
+    # Доступ в веб-админку (только для role == "hr")
+    login = Column(String, unique=True, nullable=True, index=True)
+    password_hash = Column(String, nullable=True)
 
 
 class CalendarDay(Base):

@@ -7,7 +7,7 @@ from db.database import async_session
 from sqlalchemy.future import select
 from sqlalchemy import insert, update
 from db.models import FAQ
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, extract
 from db.models import CalendarDay
 
 async def get_request_by_id(req_id: int):
@@ -33,7 +33,8 @@ async def create_pending_user(data: dict) -> int:
             car_info=data['car_info'],
             face_id_photo=data['face_id_photo'],
             approval_status="pending",
-            is_active=False
+            is_active=False,
+            language=data.get('language', 'ru'),
         )
         session.add(new_user)
         await session.commit()
@@ -127,6 +128,11 @@ async def get_user_by_telegram_id(telegram_id: int):
         result = await session.execute(select(User).where(User.telegram_id == telegram_id))
         return result.scalars().first()
 
+async def get_user_by_login(login: str):
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.login == login))
+        return result.scalars().first()
+
 async def create_request(user_id: int, req_type: str, start_date=None, end_date=None, comment=None, days_count=None):
     async with async_session() as session:
         new_req = Request(
@@ -159,6 +165,55 @@ async def calculate_actual_vacation_days(start_date, end_date) -> int:
 
     # Исключение зафиксированных праздничных дней из общего количества дней отпуска
     return total_calendar_days - holidays_count
+
+async def find_department_head(department: str):
+    """Активный руководитель (role='manager') указанного подразделения, если такой уже есть."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(User).where(
+                User.department == department,
+                User.role == "manager",
+                User.is_active == True,  # noqa: E712
+                User.approval_status == "approved",
+            ).order_by(User.id)
+        )
+        return result.scalars().first()
+
+
+async def set_user_manager(user_id: int, manager_id):
+    async with async_session() as session:
+        await session.execute(update(User).where(User.id == user_id).values(manager_id=manager_id))
+        await session.commit()
+
+
+async def resolve_manager_id(department: str, role: str):
+    """Определяет руководителя сотрудника по оргструктуре (bot/utils/org_hierarchy.py).
+    Возвращает id найденного руководителя или None, если подразделение не распознано,
+    руководитель этого уровня ещё не зарегистрирован, либо это вершина иерархии."""
+    from bot.utils.org_hierarchy import get_manager_department
+
+    if not department:
+        return None
+
+    manager_department = get_manager_department(department, role == "manager")
+    if not manager_department:
+        return None
+
+    head = await find_department_head(manager_department)
+    return head.id if head else None
+
+
+async def get_calendar_days_for_month(year: int, month: int):
+    async with async_session() as session:
+        result = await session.execute(
+            select(CalendarDay)
+            .where(
+                extract("year", CalendarDay.date) == year,
+                extract("month", CalendarDay.date) == month,
+            )
+            .order_by(CalendarDay.date)
+        )
+        return result.scalars().all()
 
 async def get_all_faqs():
     async with async_session() as session:

@@ -4,6 +4,7 @@ from sqlalchemy.future import select
 from db.database import async_session
 from db.models import Request, User
 from aiogram import Bot
+from bot.locales.texts import get_text
 from core.logging_config import action_logger
 
 _scheduler: AsyncIOScheduler | None = None
@@ -26,7 +27,7 @@ async def check_vacations_starting_today(bot: Bot):
             try:
                 await bot.send_message(
                     user.telegram_id,
-                    "Желаем вам отличного отпуска! 😊"
+                    get_text("vacation_first_day", user.language)
                 )
             except Exception:
                 pass
@@ -41,11 +42,15 @@ def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
 
 
 async def _send_sick_leave_reminder(bot: Bot, telegram_id: int):
+    lang = "ru"
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.telegram_id == telegram_id))
+        user = result.scalars().first()
+        if user:
+            lang = user.language
+
     try:
-        await bot.send_message(
-            telegram_id,
-            "Напоминаем о необходимости прикрепить подтверждающий документ после завершения больничного."
-        )
+        await bot.send_message(telegram_id, get_text("sick_reminder_3days", lang))
     except Exception:
         pass
 
