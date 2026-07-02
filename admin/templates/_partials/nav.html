@@ -1,0 +1,24 @@
+<aside class="sidebar">
+  <div class="sidebar__brand">HR Bot · Админка</div>
+  <nav class="sidebar__nav">
+    <a class="sidebar__link {{ 'active' if active_page == 'dashboard' else '' }}" href="/admin">Дашборд</a>
+    <a class="sidebar__link {{ 'active' if active_page == 'users' else '' }}" href="/admin/users">
+      Сотрудники
+      {% if nav_badges and nav_badges.pending_users %}<span class="sidebar__badge">{{ nav_badges.pending_users }}</span>{% endif %}
+    </a>
+    <a class="sidebar__link {{ 'active' if active_page == 'requests' else '' }}" href="/admin/requests">
+      Заявки
+      {% if nav_badges and nav_badges.pending_requests %}<span class="sidebar__badge">{{ nav_badges.pending_requests }}</span>{% endif %}
+    </a>
+    <a class="sidebar__link {{ 'active' if active_page == 'templates' else '' }}" href="/admin/templates">Шаблоны документов</a>
+    <a class="sidebar__link {{ 'active' if active_page == 'faq' else '' }}" href="/admin/faq">FAQ</a>
+    <a class="sidebar__link {{ 'active' if active_page == 'calendar' else '' }}" href="/admin/calendar">Производственный календарь</a>
+  </nav>
+  <div class="sidebar__user">
+    <div class="sidebar__user-name">{{ current_user.full_name }}</div>
+    <div class="sidebar__user-login">{{ current_user.login }}</div>
+    <form method="post" action="/admin/logout">
+      <button type="submit" class="btn btn-ghost btn-sm" style="width:100%; justify-content:flex-start; padding-left:0;">Выйти</button>
+    </form>
+  </div>
+</aside>

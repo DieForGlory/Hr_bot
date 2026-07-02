@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Дашборд · HR Bot Админка{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h1>Дашборд</h1>
+      <div class="page-subtitle">Общая картина по заявкам и сотрудникам</div>
+    </div>
+  </div>
+
+  <div class="stat-grid">
+    {% for s in stats %}
+      <div class="stat-card {{ 'stat-card--warn' if s.variant == 'warn' else ('stat-card--danger' if s.variant == 'danger' else '') }}">
+        <div class="stat-card__value">{{ s.value }}</div>
+        <div class="stat-card__label">{{ s.label }}</div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <h2>Последние действия</h2>
+    {% if log_entries %}
+      <table>
+        <thead><tr><th>Время</th><th>Событие</th></tr></thead>
+        <tbody>
+        {% for e in log_entries %}
+          <tr>
+            <td class="muted" style="white-space:nowrap;">{{ e.time }}</td>
+            <td>{{ e.message }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="empty-state">Пока нет записей</div>
+    {% endif %}
+  </div>
+{% endblock %}

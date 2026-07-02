@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Шаблоны документов · HR Bot Админка{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h1>Шаблоны документов</h1>
+      <div class="page-subtitle">Текст приказов и справок, которые бот генерирует автоматически</div>
+    </div>
+    <button class="btn btn-primary" id="btn-new-template">+ Новый шаблон</button>
+  </div>
+
+  <div class="card">
+    <p class="page-subtitle">Доступные плейсхолдеры: <code>{{ placeholder_hint }}</code></p>
+    <table>
+      <thead><tr><th>Название</th><th></th></tr></thead>
+      <tbody>
+        {% for t in items %}
+        <tr>
+          <td><a href="/admin/templates/{{ t.id }}">{{ t.name }}</a></td>
+          <td class="text-right"><a class="btn btn-ghost btn-sm" href="/admin/templates/{{ t.id }}">Редактировать</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="2" class="empty-state">Шаблонов пока нет</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="modal-backdrop" id="modal-new-template">
+    <div class="modal">
+      <h3>Новый шаблон</h3>
+      <div class="form-row">
+        <label>Название</label>
+        <input type="text" id="new-template-name" placeholder="Например: Отпуск">
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" id="modal-new-template-submit">Создать</button>
+        <button class="btn btn-ghost" data-close-modal="modal-new-template">Отмена</button>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("btn-new-template").addEventListener("click", () => {
+    document.getElementById("modal-new-template").classList.add("open");
+  });
+  document.querySelectorAll("[data-close-modal]").forEach((btn) => {
+    btn.addEventListener("click", () => document.getElementById(btn.dataset.closeModal).classList.remove("open"));
+  });
+  document.getElementById("modal-new-template-submit").addEventListener("click", async () => {
+    const name = document.getElementById("new-template-name").value.trim();
+    if (!name) { showToast("Укажите название", "error"); return; }
+    try {
+      const tpl = await apiFetch("/api/admin/templates", { method: "POST", json: { name, content: "" } });
+      window.location.href = `/admin/templates/${tpl.id}`;
+    } catch (e) {
+      showToast(humanizeError(e), "error");
+    }
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}{{ user.full_name }} · Сотрудники{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h1>{{ user.full_name }}</h1>
+      <div class="page-subtitle">
+        {{ roles.get(user.role, user.role) }} · {{ user.department or "без подразделения" }}
+        {% if user.approval_status == "pending" %}<span class="badge badge-pending">Ожидает решения</span>{% endif %}
+      </div>
+    </div>
+    <a class="btn" href="/admin/users">← К списку</a>
+  </div>
+
+  {% if user.approval_status == "pending" %}
+  <div class="card">
+    <h2>Решение по регистрации</h2>
+    <div class="form-actions">
+      <button class="btn btn-success" id="btn-approve-reg">Одобрить регистрацию</button>
+      <button class="btn btn-danger" id="btn-reject-reg">Отклонить регистрацию</button>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Основные данные</h2>
+    <form id="user-form">
+      <div class="form-row">
+        <label>ФИО</label>
+        <input type="text" name="full_name" value="{{ user.full_name or '' }}">
+      </div>
+      <div class="form-row">
+        <label>Подразделение</label>
+        <select name="department">
+          <option value="">—</option>
+          {% for d in departments %}
+            <option value="{{ d }}" {{ "selected" if d == user.department else "" }}>{{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Должность / статус</label>
+        <input type="text" name="position" value="{{ user.position or '' }}">
+      </div>
+      <div class="form-row">
+        <label>Роль в системе</label>
+        <select name="role">
+          {% for key, label in roles.items() %}
+            <option value="{{ key }}" {{ "selected" if key == user.role else "" }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Руководитель</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <select name="manager_id" style="flex:1;">
+            <option value="">— не назначен —</option>
+            {% for m in managers %}
+              <option value="{{ m.id }}" {{ "selected" if manager and m.id == manager.id else "" }}>{{ m.full_name }}</option>
+            {% endfor %}
+          </select>
+          <button type="button" class="btn btn-sm" id="btn-recalc-manager" title="Определить руководителя автоматически по оргструктуре">Пересчитать</button>
+        </div>
+        <div class="hint">«Пересчитать» подбирает руководителя автоматически по подразделению и должности (см. оргструктуру), либо назначьте вручную из списка выше.</div>
+      </div>
+      <div class="form-row">
+        <label>Остаток отпускных дней</label>
+        <input type="number" name="vacation_days_balance" min="0" value="{{ user.vacation_days_balance }}">
+      </div>
+      <div class="form-row">
+        <label><input type="checkbox" name="is_active" {{ "checked" if user.is_active else "" }} style="width:auto; margin-right:6px;">Активен (может пользоваться ботом)</label>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+      </div>
+    </form>
+  </div>
+
+  {% if user.role == "hr" %}
+  <div class="card">
+    <h2>Доступ в админку</h2>
+    <p class="page-subtitle" style="margin-bottom:14px;">Логин и пароль для входа в эту веб-админку. Пароль оставьте пустым, если не хотите его менять.</p>
+    <form id="credentials-form">
+      <div class="form-row">
+        <label>Логин</label>
+        <input type="text" name="login" value="{{ user.login or '' }}" required>
+      </div>
+      <div class="form-row">
+        <label>Новый пароль</label>
+        <input type="password" name="password" placeholder="Оставьте пустым, чтобы не менять" autocomplete="new-password">
+        <div class="hint">Минимум 6 символов</div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Сохранить доступ</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Служебная информация</h2>
+    <table>
+      <tbody>
+        <tr><td class="muted">Телефон</td><td>{{ user.phone or "-" }}</td></tr>
+        <tr><td class="muted">Telegram</td><td>{{ ("@" + user.tg_username) if user.tg_username else "-" }} (id {{ user.telegram_id or "-" }})</td></tr>
+        <tr><td class="muted">Дата рождения</td><td>{{ user.birth_date or "-" }}</td></tr>
+        <tr><td class="muted">Автомобиль</td><td>{{ user.car_info or "-" }}</td></tr>
+        <tr><td class="muted">Язык интерфейса</td><td>{{ user.language }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
+{% block extra_scripts %}
+  <script>
+    const USER_ID = {{ user.id }};
+  </script>
+  <script src="/admin/static/users_detail.js"></script>
+{% endblock %}

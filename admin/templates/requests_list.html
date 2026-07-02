@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Заявки · HR Bot Админка{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h1>Заявки</h1>
+      <div class="page-subtitle">Отпуска, больничные, справки — все заявки сотрудников</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="filters">
+      <div class="form-row">
+        <label>Сотрудник</label>
+        <input type="text" id="f-employee" placeholder="ФИО">
+      </div>
+      <div class="form-row">
+        <label>Тип</label>
+        <select id="f-type">
+          <option value="">Все</option>
+          {% for key, label in type_labels.items() %}
+            <option value="{{ key }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Дата с</label>
+        <input type="date" id="f-date-from">
+      </div>
+      <div class="form-row">
+        <label>Дата по</label>
+        <input type="date" id="f-date-to">
+      </div>
+      <label style="display:flex; align-items:center; gap:6px; font-size:13px; margin-bottom:1px;">
+        <input type="checkbox" id="f-only-open"> Только требующие решения
+      </label>
+      <button class="btn btn-primary btn-sm" id="btn-filter">Применить</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>№</th><th>Сотрудник</th><th>Тип</th><th>Период / дата</th><th>Статус</th><th>Подана</th><th></th></tr>
+      </thead>
+      <tbody id="requests-tbody"></tbody>
+    </table>
+    <div class="empty-state" id="requests-empty" style="display:none;">Заявок не найдено</div>
+  </div>
+{% endblock %}
+{% block extra_scripts %}
+  <script src="/admin/static/requests.js"></script>
+{% endblock %}

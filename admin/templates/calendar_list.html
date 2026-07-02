@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Производственный календарь · HR Bot Админка{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h1>Производственный календарь</h1>
+      <div class="page-subtitle">Нерабочие дни используются при расчёте количества дней отпуска</div>
+    </div>
+    <div style="display:flex; gap:10px;">
+      <button class="btn" id="btn-bulk-add">+ Добавить диапазон</button>
+      <button class="btn btn-primary" id="btn-single-add">+ Добавить день</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="filters">
+      <div class="form-row">
+        <label>Год</label>
+        <select id="f-year"></select>
+      </div>
+      <div class="form-row">
+        <label>Месяц</label>
+        <select id="f-month">
+          <option value="">Все</option>
+          <option value="1">Январь</option><option value="2">Февраль</option><option value="3">Март</option>
+          <option value="4">Апрель</option><option value="5">Май</option><option value="6">Июнь</option>
+          <option value="7">Июль</option><option value="8">Август</option><option value="9">Сентябрь</option>
+          <option value="10">Октябрь</option><option value="11">Ноябрь</option><option value="12">Декабрь</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-sm" id="btn-filter">Показать</button>
+    </div>
+
+    <table>
+      <thead><tr><th>Дата</th><th>Тип дня</th><th>Описание</th><th></th></tr></thead>
+      <tbody id="calendar-tbody"></tbody>
+    </table>
+    <div class="empty-state" id="calendar-empty" style="display:none;">Записей нет</div>
+  </div>
+
+  <div class="modal-backdrop" id="modal-single">
+    <div class="modal">
+      <h3>Добавить день</h3>
+      <div class="form-row"><label>Дата</label><input type="date" id="single-date"></div>
+      <div class="form-row"><label><input type="checkbox" id="single-workday" style="width:auto; margin-right:6px;">Рабочий день (несмотря на выходной/праздник)</label></div>
+      <div class="form-row"><label>Описание</label><input type="text" id="single-desc" placeholder="Например: Новый год"></div>
+      <div class="form-actions">
+        <button class="btn btn-primary" id="modal-single-submit">Добавить</button>
+        <button class="btn btn-ghost" data-close-modal="modal-single">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modal-bulk">
+    <div class="modal">
+      <h3>Добавить диапазон дат</h3>
+      <div class="form-row"><label>Дата с</label><input type="date" id="bulk-from"></div>
+      <div class="form-row"><label>Дата по</label><input type="date" id="bulk-to"></div>
+      <div class="form-row"><label><input type="checkbox" id="bulk-workday" style="width:auto; margin-right:6px;">Рабочие дни</label></div>
+      <div class="form-row"><label>Описание</label><input type="text" id="bulk-desc" placeholder="Например: Праздничные дни"></div>
+      <div class="hint" style="margin-bottom:12px;">Существующие даты в диапазоне не будут затронуты.</div>
+      <div class="form-actions">
+        <button class="btn btn-primary" id="modal-bulk-submit">Добавить диапазон</button>
+        <button class="btn btn-ghost" data-close-modal="modal-bulk">Отмена</button>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+{% block extra_scripts %}
+<script>const CURRENT_YEAR = {{ current_year }};</script>
+<script src="/admin/static/calendar.js"></script>
+{% endblock %}

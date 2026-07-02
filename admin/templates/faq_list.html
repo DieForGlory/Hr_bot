@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}FAQ · HR Bot Админка{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h1>FAQ</h1>
+      <div class="page-subtitle">Быстрые ответы, которые сотрудники видят в разделе «FAQ» бота</div>
+    </div>
+    <button class="btn btn-primary" id="btn-new-faq">+ Добавить вопрос</button>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead><tr><th style="width:40%;">Вопрос</th><th>Ответ</th><th></th></tr></thead>
+      <tbody>
+        {% for f in items %}
+        <tr>
+          <td>{{ f.question }}</td>
+          <td class="muted">{{ f.answer[:120] }}{{ "…" if f.answer|length > 120 else "" }}</td>
+          <td class="text-right">
+            <button class="btn btn-ghost btn-sm" data-edit-id="{{ f.id }}" data-edit-q="{{ f.question }}" data-edit-a="{{ f.answer }}">Изменить</button>
+            <button class="btn btn-danger btn-sm" data-delete-id="{{ f.id }}" data-confirm="Удалить вопрос «{{ f.question }}»?">Удалить</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="empty-state">Вопросов пока нет</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="modal-backdrop" id="modal-faq">
+    <div class="modal" style="width:520px;">
+      <h3 id="modal-faq-title">Новый вопрос</h3>
+      <input type="hidden" id="faq-id">
+      <div class="form-row">
+        <label>Вопрос</label>
+        <input type="text" id="faq-question">
+      </div>
+      <div class="form-row">
+        <label>Ответ</label>
+        <textarea id="faq-answer" rows="5"></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" id="modal-faq-submit">Сохранить</button>
+        <button class="btn btn-ghost" data-close-modal="modal-faq">Отмена</button>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="/admin/static/faq.js"></script>
+{% endblock %}

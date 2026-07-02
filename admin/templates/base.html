@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}HR Bot · Админка{% endblock %}</title>
+  <link rel="stylesheet" href="/admin/static/admin.css">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <div class="layout">
+    {% include "_partials/nav.html" %}
+    <main class="content">
+      {% if request.query_params.get('ok') %}
+        <div class="alert alert-success">{{ request.query_params.get('ok') }}</div>
+      {% endif %}
+      {% if request.query_params.get('error') %}
+        <div class="alert alert-error">{{ request.query_params.get('error') }}</div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <div id="toast-container"></div>
+  <script src="/admin/static/admin.js"></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

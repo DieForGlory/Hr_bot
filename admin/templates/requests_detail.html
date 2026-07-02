@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}Заявка №{{ req.id }} · HR Bot Админка{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h1>Заявка №{{ req.id }} — {{ type_label }}</h1>
+      <div class="page-subtitle">
+        Сотрудник: <a href="/admin/users/{{ req.user_id }}">{{ employee.full_name if employee else "?" }}</a>
+        · Подана {{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}
+      </div>
+    </div>
+    <a class="btn" href="/admin/requests">← К списку</a>
+  </div>
+
+  <div class="card">
+    <h2>Статус: <span class="badge" id="status-badge">{{ status_label }}</span></h2>
+
+    <table style="margin-bottom: 6px;">
+      <tbody>
+        {% if req.start_date %}
+        <tr><td class="muted" style="width:220px;">Период</td>
+          <td>{{ req.start_date.strftime('%d.%m.%Y') }}{% if req.end_date %} — {{ req.end_date.strftime('%d.%m.%Y') }}{% endif %}</td></tr>
+        {% endif %}
+        {% if req.days_count %}
+        <tr><td class="muted">Количество дней</td><td>{{ req.days_count }}</td></tr>
+        {% endif %}
+        {% if req.comment %}
+        <tr><td class="muted">Комментарий сотрудника</td><td>{{ req.comment }}</td></tr>
+        {% endif %}
+        {% if is_vacation and req.manager_comment %}
+        <tr><td class="muted">Комментарий руководителя</td><td>{{ req.manager_comment }}</td></tr>
+        {% endif %}
+        {% if req.hr_comment %}
+        <tr><td class="muted">{{ "Комментарий HR" if is_vacation else "Комментарий" }}</td><td>{{ req.hr_comment }}</td></tr>
+        {% endif %}
+        {% if is_vacation and req.manager_decided_at %}
+        <tr><td class="muted">Решение руководителя</td><td>{{ req.manager_decided_at.strftime('%d.%m.%Y %H:%M') }}</td></tr>
+        {% endif %}
+        {% if is_vacation and req.hr_decided_at %}
+        <tr><td class="muted">Решение HR</td><td>{{ req.hr_decided_at.strftime('%d.%m.%Y %H:%M') }}</td></tr>
+        {% endif %}
+        {% if not is_vacation and (req.manager_decided_at or req.hr_decided_at) %}
+        <tr><td class="muted">Дата решения</td><td>{{ (req.hr_decided_at or req.manager_decided_at).strftime('%d.%m.%Y %H:%M') }}</td></tr>
+        {% endif %}
+        {% if req.file_path %}
+        <tr><td class="muted">Файл</td><td>прикреплён</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+
+    {% if is_vacation and req.status == "pending" %}
+      <div class="alert" style="background:#eff4ff; color:#2563eb;">
+        Заявка ожидает решения руководителя в Telegram.
+        {% if manager %}Руководитель: <strong>{{ manager.full_name }}</strong>.{% endif %}
+        Согласовать или отклонить на этом этапе может только он — из веб-админки это недоступно.
+      </div>
+      {% if not manager %}
+      <div class="alert alert-error">
+        ⚠️ У сотрудника не назначен руководитель — уведомление о заявке никому не отправлено, и заявка не сможет продвинуться дальше.
+        Назначьте руководителя в <a href="/admin/users/{{ req.user_id }}">карточке сотрудника</a>.
+      </div>
+      {% endif %}
+    {% endif %}
+
+    <div class="form-actions" id="actions-vacation" style="display:none;">
+      <button class="btn btn-success" id="btn-approve">Согласовать</button>
+      <button class="btn btn-danger" id="btn-reject">Отклонить</button>
+    </div>
+
+    <div class="form-actions" id="actions-cert-pending" style="display:none;">
+      <button class="btn" id="btn-cert-progress">Взять в работу</button>
+      <button class="btn btn-success" id="btn-cert-done">Готово</button>
+      <button class="btn btn-danger" id="btn-cert-reject">Отклонить</button>
+    </div>
+
+    <div class="form-actions" id="actions-cert-progress" style="display:none;">
+      <button class="btn btn-success" id="btn-cert-done-2">Готово</button>
+      <button class="btn btn-danger" id="btn-cert-reject-2">Отклонить</button>
+    </div>
+  </div>
+
+  <!-- Модалка согласования (опциональный комментарий) -->
+  <div class="modal-backdrop" id="modal-approve">
+    <div class="modal">
+      <h3>Согласовать заявку</h3>
+      <div class="form-row">
+        <label>Комментарий (необязательно)</label>
+        <textarea id="approve-comment"></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-success" id="modal-approve-submit">Согласовать</button>
+        <button class="btn btn-ghost" data-close-modal="modal-approve">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка отклонения (комментарий обязателен) -->
+  <div class="modal-backdrop" id="modal-reject">
+    <div class="modal">
+      <h3>Отклонить заявку</h3>
+      <div class="form-row">
+        <label>Причина отклонения (обязательно)</label>
+        <textarea id="reject-comment" required></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-danger" id="modal-reject-submit">Отклонить</button>
+        <button class="btn btn-ghost" data-close-modal="modal-reject">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка "Готово" для справки -->
+  <div class="modal-backdrop" id="modal-cert-done">
+    <div class="modal">
+      <h3>Справка готова</h3>
+      <div class="form-row">
+        <label>Файл (PDF/фото, необязательно)</label>
+        <input type="file" id="cert-done-file">
+      </div>
+      <div class="form-row">
+        <label>Место получения (необязательно)</label>
+        <input type="text" id="cert-done-note">
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-success" id="modal-cert-done-submit">Отправить сотруднику</button>
+        <button class="btn btn-ghost" data-close-modal="modal-cert-done">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка отклонения справки -->
+  <div class="modal-backdrop" id="modal-cert-reject">
+    <div class="modal">
+      <h3>Отклонить заявку на справку</h3>
+      <div class="form-row">
+        <label>Причина отклонения (обязательно)</label>
+        <textarea id="cert-reject-comment" required></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-danger" id="modal-cert-reject-submit">Отклонить</button>
+        <button class="btn btn-ghost" data-close-modal="modal-cert-reject">Отмена</button>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+{% block extra_scripts %}
+  <script>
+    const REQ_ID = {{ req.id }};
+    const REQ_TYPE = "{{ req.type }}";
+    const REQ_STATUS = "{{ req.status }}";
+    const IS_CERT = {{ "true" if is_cert else "false" }};
+    const IS_VACATION = {{ "true" if is_vacation else "false" }};
+  </script>
+  <script src="/admin/static/requests_detail.js"></script>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ tpl.name }} · Шаблоны{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h1>Шаблон: {{ tpl.name }}</h1>
+      <div class="page-subtitle">Плейсхолдеры: <code>{{ placeholder_hint }}</code></div>
+    </div>
+    <a class="btn" href="/admin/templates">← К списку</a>
+  </div>
+
+  <div class="card">
+    <form id="tpl-form">
+      <div class="form-row">
+        <label>Название</label>
+        <input type="text" name="name" value="{{ tpl.name }}">
+      </div>
+      <div class="form-row">
+        <label>Текст документа</label>
+        <textarea name="content" rows="16" style="min-height:340px; font-family: Consolas, monospace;">{{ tpl.content or "" }}</textarea>
+        <div class="hint">Если оставить пустым или указать неизвестный плейсхолдер — бот использует встроенный запасной шаблон.</div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+        <button type="button" class="btn btn-danger" id="btn-delete-tpl" data-confirm="Удалить шаблон «{{ tpl.name }}»? Если это шаблон «Отпуск» — бот перейдёт на встроенный запасной вариант.">Удалить</button>
+      </div>
+    </form>
+  </div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+const TPL_ID = {{ tpl.id }};
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("tpl-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    try {
+      await apiFetch(`/api/admin/templates/${TPL_ID}`, { method: "PATCH", json: { name: fd.get("name"), content: fd.get("content") } });
+      showToast("Шаблон сохранён");
+    } catch (err) {
+      showToast(humanizeError(err), "error");
+    }
+  });
+  document.getElementById("btn-delete-tpl").addEventListener("click", async () => {
+    try {
+      await apiFetch(`/api/admin/templates/${TPL_ID}`, { method: "DELETE" });
+      window.location.href = "/admin/templates";
+    } catch (err) {
+      showToast(humanizeError(err), "error");
+    }
+  });
+});
+</script>
+{% endblock %}
