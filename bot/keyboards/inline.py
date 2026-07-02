@@ -31,6 +31,13 @@ def get_faq_back_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="Назад к списку вопросов", callback_data="faq_back")]
     ])
 
+def get_cert_status_keyboard(request_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="В работу", callback_data=f"cert_progress_{request_id}")],
+        [InlineKeyboardButton(text="Готово", callback_data=f"cert_done_{request_id}")],
+        [InlineKeyboardButton(text="Отклонить", callback_data=f"cert_reject_{request_id}")]
+    ])
+
 def get_faq_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Аванс и ЗП", callback_data="faq_salary")],

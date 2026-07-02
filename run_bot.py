@@ -1,22 +1,23 @@
 import asyncio
-import aiohttp
-from db.database import engine, Base
+from db.database import engine, Base, async_session, seed_faq, seed_templates
 import db.models
-_orig_connector_init = aiohttp.TCPConnector.__init__
-
-def _patched_connector_init(self, *args, **kwargs):
-    kwargs['ssl'] = False
-    _orig_connector_init(self, *args, **kwargs)
-
-aiohttp.TCPConnector.__init__ = _patched_connector_init
+from core.logging_config import setup_logging
 
 from aiogram import Bot, Dispatcher
 from core.config import BOT_TOKEN
 from bot.handlers import auth, main_menu, vacation, certificates, sick_leave, approvals, hr_question, settings
+from bot.utils.scheduler import setup_scheduler
 
 async def main():
+    setup_logging()
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    async with async_session() as session:
+        await seed_faq(session)
+        await seed_templates(session)
+
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
 
@@ -28,6 +29,9 @@ async def main():
     dp.include_router(approvals.router)
     dp.include_router(hr_question.router)
     dp.include_router(settings.router)
+
+    scheduler = setup_scheduler(bot)
+    scheduler.start()
 
     await dp.start_polling(bot)
 

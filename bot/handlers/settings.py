@@ -6,6 +6,7 @@ from sqlalchemy import update
 from db.database import async_session
 from db.models import User
 from aiogram.filters import Command
+from core.logging_config import action_logger
 
 router = Router()
 
@@ -28,6 +29,7 @@ async def process_language_change(callback: types.CallbackQuery):
         await session.execute(update(User).where(User.id == user.id).values(language=lang))
         await session.commit()
 
+    action_logger.info("language_changed user_id=%s lang=%s", user.id, lang)
     await callback.message.edit_text(get_text("lang_saved", lang))
 
     from bot.handlers.main_menu import get_main_keyboard

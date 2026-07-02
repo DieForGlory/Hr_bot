@@ -1,18 +1,14 @@
-from datetime import datetime
 from aiogram import Router, F, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery
 from aiogram3_calendar import SimpleCalendar, simple_cal_callback
-from bot.utils.db_api import get_user_by_telegram_id, create_request
+from bot.utils.db_api import get_user_by_telegram_id, create_request, calculate_actual_vacation_days
 from bot.handlers.main_menu import get_main_keyboard
-from bot.utils.db_api import calculate_actual_vacation_days
-from aiogram3_calendar import SimpleCalendar
-from aiogram.filters import Filter
-from aiogram.types import CallbackQuery
-from aiogram3_calendar import SimpleCalendar
-from aiogram3_calendar import SimpleCalendar
-from aiogram import F, types
+from bot.utils.validators import to_date, is_valid_vacation_start
+from bot.locales.texts import get_text
+from core.logging_config import action_logger
+
 router = Router()
 
 
@@ -23,90 +19,150 @@ class VacationState(StatesGroup):
 
 @router.message(F.text == "📄 Отпуск")
 async def vacation_menu(message: types.Message):
-    # Убрано использование ReplyKeyboardMarkup для типов отпуска,
-    # заменено на Inline для согласованности потока
+    user = await get_user_by_telegram_id(message.from_user.id)
+    lang = user.language if user else "ru"
     from bot.keyboards.inline import get_vacation_types_kb
-    await message.answer("Выберите тип отпуска:", reply_markup=get_vacation_types_kb())
+    await message.answer(get_text("vacation_choose_type", lang), reply_markup=get_vacation_types_kb())
 
 
 @router.callback_query(F.data.startswith("vac_type_"))
 async def start_vacation_request(callback: CallbackQuery, state: FSMContext):
     vac_type = callback.data.split("_")[2]
-    user = await get_user_by_telegram_id(callback.from_user.id)
-
-    if vac_type == "paid" and user.vacation_days_balance <= 0:
-        await callback.message.answer("У вас нет доступных дней для оплачиваемого отпуска.")
+    if vac_type not in ("paid", "unpaid"):
         await callback.answer()
         return
 
+    user = await get_user_by_telegram_id(callback.from_user.id)
+    if not user:
+        await callback.answer()
+        return
+    lang = user.language
+
+    if vac_type == "paid":
+        if user.vacation_days_balance <= 0:
+            await callback.message.answer(get_text("vacation_no_balance", lang))
+            await callback.answer()
+            return
+        # Показываем остаток отпускных дней перед подачей заявки
+        await callback.message.answer(f"Ваш остаток отпускных дней: {user.vacation_days_balance}")
+
     await state.update_data(vacation_type=vac_type, balance=user.vacation_days_balance)
     await callback.message.answer(
-        "Выберите дату начала отпуска:",
+        get_text("vacation_choose_start", lang),
         reply_markup=await SimpleCalendar().start_calendar()
     )
     await state.set_state(VacationState.waiting_for_start_date)
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("simple_calendar"), VacationState.waiting_for_start_date)
-async def process_start_date(callback: CallbackQuery, state: FSMContext):
-    selected, date = await SimpleCalendar().process_selection(callback, callback.data)
-    if selected:
-        await state.update_data(start_date=date)
+@router.callback_query(simple_cal_callback.filter(), VacationState.waiting_for_start_date)
+async def process_start_date(callback: CallbackQuery, callback_data: simple_cal_callback, state: FSMContext):
+    user = await get_user_by_telegram_id(callback.from_user.id)
+    lang = user.language if user else "ru"
+    selected, selected_date = await SimpleCalendar().process_selection(callback, callback_data)
+    if not selected:
+        return
+
+    start_date = to_date(selected_date)
+    if not is_valid_vacation_start(start_date):
         await callback.message.answer(
-            "Выберите дату окончания отпуска:",
+            get_text("vacation_start_in_past", lang),
             reply_markup=await SimpleCalendar().start_calendar()
         )
-        await state.set_state(VacationState.waiting_for_end_date)
+        return
+
+    await state.update_data(start_date=start_date)
+    await callback.message.answer(
+        get_text("vacation_choose_end", lang),
+        reply_markup=await SimpleCalendar().start_calendar()
+    )
+    await state.set_state(VacationState.waiting_for_end_date)
 
 
-@router.callback_query(F.data.startswith("simple_calendar"), VacationState.waiting_for_end_date)
-async def process_end_date(callback: types.CallbackQuery, state: FSMContext):
-    selected, end_date = await SimpleCalendar().process_selection(callback, callback.data)
-    if selected:
-        data = await state.get_data()
-        start_date = data['start_date']
+@router.callback_query(simple_cal_callback.filter(), VacationState.waiting_for_end_date)
+async def process_end_date(callback: types.CallbackQuery, callback_data: simple_cal_callback, state: FSMContext):
+    user = await get_user_by_telegram_id(callback.from_user.id)
+    lang = user.language if user else "ru"
+    selected, selected_date = await SimpleCalendar().process_selection(callback, callback_data)
+    if not selected:
+        return
 
-        if end_date < start_date:
-            await callback.message.answer("Дата окончания не может быть раньше даты начала.")
-            return
+    end_date = to_date(selected_date)
+    data = await state.get_data()
+    start_date = data.get('start_date')
+    if not start_date or not data.get('vacation_type'):
+        await callback.message.answer(get_text("session_expired", lang))
+        await state.clear()
+        return
 
-        # Расчет дней с учетом производственного календаря
-        actual_days = await calculate_actual_vacation_days(start_date, end_date)
-
-        if actual_days <= 0:
-            await callback.message.answer("Выбранный период содержит только нерабочие дни.")
-            return
-
-        if data['vacation_type'] == 'paid' and actual_days > data['balance']:
-            await callback.message.answer(f"Запрошено {actual_days} дней. Доступно только {data['balance']}.")
-            return
-
-        await state.update_data(end_date=end_date, days_count=actual_days)
-
-        from bot.keyboards.inline import get_confirm_kb
+    if end_date < start_date:
         await callback.message.answer(
-            f"Подтверждение:\nПериод: {start_date.strftime('%d.%m.%Y')} - {end_date.strftime('%d.%m.%Y')}\n"
-            f"Количество списываемых дней: {actual_days}",
-            reply_markup=get_confirm_kb()
+            get_text("vacation_end_before_start", lang),
+            reply_markup=await SimpleCalendar().start_calendar()
         )
+        return
+
+    # Расчет дней с учетом производственного календаря
+    actual_days = await calculate_actual_vacation_days(start_date, end_date)
+
+    if actual_days <= 0:
+        await callback.message.answer(
+            get_text("vacation_only_holidays", lang),
+            reply_markup=await SimpleCalendar().start_calendar()
+        )
+        return
+
+    if data['vacation_type'] == 'paid' and actual_days > data['balance']:
+        await callback.message.answer(
+            f"Запрошено {actual_days} дней. Доступно только {data['balance']}.\n"
+            f"Выберите дату окончания заново:",
+            reply_markup=await SimpleCalendar().start_calendar()
+        )
+        return
+
+    await state.update_data(end_date=end_date, days_count=actual_days)
+
+    from bot.keyboards.inline import get_confirm_kb
+    await callback.message.answer(
+        f"Подтверждение:\nПериод: {start_date.strftime('%d.%m.%Y')} - {end_date.strftime('%d.%m.%Y')}\n"
+        f"Количество списываемых дней: {actual_days}",
+        reply_markup=get_confirm_kb()
+    )
 
 
 @router.callback_query(F.data == "confirm_vacation")
 async def confirm_vacation(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     user = await get_user_by_telegram_id(callback.from_user.id)
+    lang = user.language if user else "ru"
+
+    # Защита от повторного клика по кнопке после отправки заявки
+    if not user or not data.get('start_date') or not data.get('end_date') or not data.get('vacation_type'):
+        await callback.answer(get_text("session_expired", lang), show_alert=True)
+        return
 
     req_id = await create_request(
         user_id=user.id,
         req_type=f"vacation_{data['vacation_type']}",
         start_date=data['start_date'],
-        end_date=data['end_date']
+        end_date=data['end_date'],
+        days_count=data['days_count']
     )
+    action_logger.info("request_created type=vacation_%s user_id=%s req_id=%s", data['vacation_type'], user.id, req_id)
 
     # Маршрутизация уведомления руководителю
     from bot.utils.routing import notify_manager
     await notify_manager(callback.bot, user, req_id, data)
 
-    await callback.message.answer("Ваша заявка принята и направлена на согласование.", reply_markup=get_main_keyboard())
+    await callback.message.answer(get_text("vacation_submitted", lang), reply_markup=get_main_keyboard(lang))
     await state.clear()
+    await callback.answer()
+
+
+@router.callback_query(F.data == "cancel_action")
+async def cancel_action(callback: CallbackQuery, state: FSMContext):
+    user = await get_user_by_telegram_id(callback.from_user.id)
+    lang = user.language if user else "ru"
+    await state.clear()
+    await callback.message.answer(get_text("back_to_menu", lang), reply_markup=get_main_keyboard(lang))
+    await callback.answer()

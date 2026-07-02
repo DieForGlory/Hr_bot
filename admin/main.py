@@ -1,29 +1,18 @@
-import ssl
-import aiohttp
 from fastapi import FastAPI
 from sqladmin import Admin, ModelView
 from aiogram import Bot
-from aiogram.client.session.aiohttp import AiohttpSession
 
 from db.database import engine
-from db.models import User, Request as HRRequest, DocumentTemplate, CalendarDay
+from db.models import User, Request as HRRequest, DocumentTemplate, CalendarDay, FAQ
 from core.config import BOT_TOKEN
+from bot.utils.db_api import get_user_by_id
+from core.logging_config import action_logger
 
 # Инициализация FastAPI
 app = FastAPI(title="HR Bot Admin")
 
-# Интеграция бота для уведомлений (с обходом SSL)
-ssl_context = ssl.create_default_context()
-ssl_context.check_hostname = False
-ssl_context.verify_mode = ssl.CERT_NONE
-connector = aiohttp.TCPConnector(ssl=ssl_context)
-session = AiohttpSession()
-
-async def create_client_session():
-    return aiohttp.ClientSession(connector=connector)
-session._create_client_session = create_client_session
-
-bot = Bot(token=BOT_TOKEN, session=session)
+# Интеграция бота для уведомлений
+bot = Bot(token=BOT_TOKEN)
 
 # Инициализация SQLAdmin
 admin = Admin(app, engine, title="Управление HR Bot")
@@ -37,7 +26,10 @@ class UserAdmin(ModelView, model=User):
     icon = "fa-solid fa-users"
 
 class RequestAdmin(ModelView, model=HRRequest):
-    column_list = [HRRequest.id, HRRequest.user_id, HRRequest.status]
+    column_list = [
+        HRRequest.id, HRRequest.user_id, HRRequest.type, HRRequest.status,
+        HRRequest.created_at, HRRequest.manager_comment, HRRequest.hr_comment,
+    ]
     column_searchable_list = [HRRequest.status]
     name = "Заявка"
     name_plural = "Заявки"
@@ -46,18 +38,35 @@ class RequestAdmin(ModelView, model=HRRequest):
     async def on_model_change(self, data, model, is_created, request):
         if not is_created and "status" in data:
             try:
-                await bot.send_message(
-                    chat_id=model.user_id,
-                    text=f"Статус вашей заявки изменен: {data['status']}"
+                employee = await get_user_by_id(model.user_id)
+                if employee and employee.telegram_id:
+                    await bot.send_message(
+                        chat_id=employee.telegram_id,
+                        text=f"Статус вашей заявки изменен: {data['status']}"
+                    )
+                action_logger.info(
+                    "admin_status_change req_id=%s user_id=%s status=%s",
+                    model.id, model.user_id, data['status']
                 )
             except Exception as e:
                 print(f"Ошибка отправки уведомления: {e}")
 
 class DocumentTemplateAdmin(ModelView, model=DocumentTemplate):
-    column_list = [DocumentTemplate.id, DocumentTemplate.name, DocumentTemplate.file_path]
+    column_list = [DocumentTemplate.id, DocumentTemplate.name]
+    form_columns = [DocumentTemplate.name, DocumentTemplate.content, DocumentTemplate.file_path]
+    column_details_list = [DocumentTemplate.id, DocumentTemplate.name, DocumentTemplate.content, DocumentTemplate.file_path]
     name = "Шаблон"
     name_plural = "Шаблоны документов"
     icon = "fa-solid fa-file-word"
+
+class FAQAdmin(ModelView, model=FAQ):
+    column_list = [FAQ.id, FAQ.question]
+    form_columns = [FAQ.question, FAQ.answer]
+    column_details_list = [FAQ.id, FAQ.question, FAQ.answer]
+    column_searchable_list = [FAQ.question]
+    name = "Вопрос FAQ"
+    name_plural = "FAQ"
+    icon = "fa-solid fa-circle-question"
 
 class CalendarDayAdmin(ModelView, model=CalendarDay):
     column_list = [CalendarDay.id, CalendarDay.date, CalendarDay.is_workday]
@@ -69,4 +78,5 @@ class CalendarDayAdmin(ModelView, model=CalendarDay):
 admin.add_view(UserAdmin)
 admin.add_view(RequestAdmin)
 admin.add_view(DocumentTemplateAdmin)
+admin.add_view(FAQAdmin)
 admin.add_view(CalendarDayAdmin)

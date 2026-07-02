@@ -1,9 +1,13 @@
+from datetime import date, datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from datetime import date
 from sqlalchemy.future import select
 from db.database import async_session
 from db.models import Request, User
 from aiogram import Bot
+from core.logging_config import action_logger
+
+_scheduler: AsyncIOScheduler | None = None
+
 
 async def check_vacations_starting_today(bot: Bot):
     today = date.today()
@@ -27,31 +31,34 @@ async def check_vacations_starting_today(bot: Bot):
             except Exception:
                 pass
 
-def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
-    scheduler = AsyncIOScheduler()
-    scheduler.add_job(check_vacations_starting_today, 'cron', hour=9, minute=0, args=[bot])
-    return scheduler
 
-async def _send_sick_leave_reminder(bot, user_id: int):
+def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
+    global _scheduler
+    _scheduler = AsyncIOScheduler()
+    _scheduler.add_job(check_vacations_starting_today, 'cron', hour=9, minute=0, args=[bot])
+    action_logger.info("scheduler_started")
+    return _scheduler
+
+
+async def _send_sick_leave_reminder(bot: Bot, telegram_id: int):
     try:
-        await bot.send_message(user_id, "Напоминание: предоставьте закрытый лист нетрудоспособности в HR-отдел.")
+        await bot.send_message(
+            telegram_id,
+            "Напоминаем о необходимости прикрепить подтверждающий документ после завершения больничного."
+        )
     except Exception:
         pass
 
-def schedule_sick_leave_reminder(*args, **kwargs):
-    """
-    Универсальная обертка планировщика.
-    Ожидаемые позиционные или именованные аргументы: scheduler, bot, user_id, run_date
-    """
-    scheduler = kwargs.get('scheduler') or (args[0] if len(args) > 0 else None)
-    bot = kwargs.get('bot') or (args[1] if len(args) > 1 else None)
-    user_id = kwargs.get('user_id') or (args[2] if len(args) > 2 else None)
-    run_date = kwargs.get('run_date') or (args[3] if len(args) > 3 else None)
 
-    if scheduler and bot and user_id and run_date:
-        scheduler.add_job(
-            _send_sick_leave_reminder,
-            trigger='date',
-            run_date=run_date,
-            args=[bot, user_id]
-        )
+def schedule_sick_leave_reminder(bot: Bot, telegram_id: int) -> None:
+    """Регистрирует напоминание через 3 дня после подачи заявки на больничный."""
+    if _scheduler is None:
+        return
+
+    run_date = datetime.now() + timedelta(days=3)
+    _scheduler.add_job(
+        _send_sick_leave_reminder,
+        trigger='date',
+        run_date=run_date,
+        args=[bot, telegram_id]
+    )

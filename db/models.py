@@ -1,6 +1,5 @@
-from sqlalchemy import Column, Integer, BigInteger, String, Boolean, Date, ForeignKey, DateTime, func
+from sqlalchemy import Column, Integer, BigInteger, String, Text, Boolean, Date, ForeignKey, DateTime, func
 from db.database import Base
-from sqlalchemy import Column, Integer, Date, Boolean
 
 class User(Base):
     __tablename__ = "users"
@@ -36,12 +35,15 @@ class Request(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     type = Column(String) # vacation_paid, vacation_unpaid, income_cert, work_cert, sick_leave
-    status = Column(String, default="pending") # pending, manager_approved, hr_approved, rejected, done
+    status = Column(String, default="pending") # pending, manager_approved, hr_approved, rejected, done / in_progress (cert)
     start_date = Column(Date, nullable=True)
     end_date = Column(Date, nullable=True)
     days_count = Column(Integer, nullable=True)
     comment = Column(String, nullable=True)
     hr_comment = Column(String, nullable=True)
+    manager_comment = Column(String, nullable=True)
+    manager_decided_at = Column(DateTime, nullable=True)
+    hr_decided_at = Column(DateTime, nullable=True)
     file_path = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
@@ -49,10 +51,12 @@ class DocumentTemplate(Base):
     __tablename__ = "templates"
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
-    file_path = Column(String, nullable=False)
+    # Текст шаблона редактируется прямо в админке; file_path — запасной вариант (файл на диске)
+    content = Column(Text, nullable=True)
+    file_path = Column(String, nullable=True)
 
 class FAQ(Base):
     __tablename__ = "faq"
     id = Column(Integer, primary_key=True, autoincrement=True)
     question = Column(String)
-    answer = Column(String)
+    answer = Column(Text)

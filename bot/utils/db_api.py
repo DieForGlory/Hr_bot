@@ -48,13 +48,59 @@ async def update_user_approval(user_id: int, status: str):
             .values(approval_status=status, is_active=is_active)
         )
         await session.commit()
-async def update_request_status(req_id: int, status: str, hr_comment: str = None):
+async def update_request_status(req_id: int, status: str, hr_comment: str = None, manager_comment: str = None):
+    from datetime import datetime
+
     async with async_session() as session:
+        result = await session.execute(select(Request).where(Request.id == req_id))
+        req = result.scalars().first()
+        if not req:
+            return
+        previous_status = req.status
+
         values = {"status": status}
         if hr_comment:
             values["hr_comment"] = hr_comment
+        if manager_comment:
+            values["manager_comment"] = manager_comment
+
+        if status == "manager_approved":
+            values["manager_decided_at"] = datetime.now()
+        elif status in ("hr_approved", "done"):
+            values["hr_decided_at"] = datetime.now()
+        elif status == "rejected":
+            if previous_status == "pending":
+                values["manager_decided_at"] = datetime.now()
+            else:
+                values["hr_decided_at"] = datetime.now()
+
+        # Списываем баланс ровно один раз, при первом переходе в hr_approved
+        if status == "hr_approved" and previous_status != "hr_approved" and req.type == "vacation_paid" and req.days_count:
+            await session.execute(
+                update(User)
+                .where(User.id == req.user_id)
+                .values(vacation_days_balance=User.vacation_days_balance - req.days_count)
+            )
+
         await session.execute(update(Request).where(Request.id == req_id).values(**values))
         await session.commit()
+
+
+async def attach_sick_leave_document(req_id: int, file_id: str):
+    async with async_session() as session:
+        await session.execute(update(Request).where(Request.id == req_id).values(file_path=file_id))
+        await session.commit()
+
+
+async def get_open_sick_leave_request(user_id: int):
+    """Последний больничный сотрудника без прикреплённого документа."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(Request)
+            .where(Request.user_id == user_id, Request.type == "sick_leave", Request.file_path.is_(None))
+            .order_by(Request.id.desc())
+        )
+        return result.scalars().first()
 
 async def get_user_by_id(user_id: int):
     async with async_session() as session:
@@ -81,14 +127,15 @@ async def get_user_by_telegram_id(telegram_id: int):
         result = await session.execute(select(User).where(User.telegram_id == telegram_id))
         return result.scalars().first()
 
-async def create_request(user_id: int, req_type: str, start_date=None, end_date=None, comment=None):
+async def create_request(user_id: int, req_type: str, start_date=None, end_date=None, comment=None, days_count=None):
     async with async_session() as session:
         new_req = Request(
             user_id=user_id,
             type=req_type,
             start_date=start_date,
             end_date=end_date,
-            comment=comment
+            comment=comment,
+            days_count=days_count
         )
         session.add(new_req)
         await session.commit()
