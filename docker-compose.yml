@@ -11,7 +11,7 @@ services:
 
   admin:
     build: .
-    command: sh -c "python scripts/init_admin.py && uvicorn run_admin:app --host 0.0.0.0 --port 8000"
+    command: sh -c "uvicorn run_admin:app --host 0.0.0.0 --port 8000"
     environment:
       - PYTHONPATH=/app
     ports:

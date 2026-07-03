@@ -4,7 +4,12 @@ from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base
 
-load_dotenv()
+try:
+    load_dotenv()
+except Exception:
+    # В контейнере переменные приходят из compose (env_file/environment),
+    # поэтому битая кодировка .env не должна ронять запуск.
+    pass
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///hr_bot.db")
 
