@@ -18,7 +18,7 @@
     <div class="sidebar__user-name">{{ current_user.full_name }}</div>
     <div class="sidebar__user-login">{{ current_user.username }}</div>
     <!-- Выход из общей авторизации шлюза (SSO). Путь /logout — на уровне шлюза, без префикса. -->
-    <form method="post" action="/logout">
+    <form method="post" action="/menu">
       <button type="submit" class="btn btn-ghost btn-sm" style="width:100%; justify-content:flex-start; padding-left:0;">Выйти</button>
     </form>
   </div>
