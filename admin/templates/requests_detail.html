@@ -5,11 +5,11 @@
     <div>
       <h1>Заявка №{{ req.id }} — {{ type_label }}</h1>
       <div class="page-subtitle">
-        Сотрудник: <a href="/admin/users/{{ req.user_id }}">{{ employee.full_name if employee else "?" }}</a>
+        Сотрудник: <a href="{{ base_path }}/admin/users/{{ req.user_id }}">{{ employee.full_name if employee else "?" }}</a>
         · Подана {{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}
       </div>
     </div>
-    <a class="btn" href="/admin/requests">← К списку</a>
+    <a class="btn" href="{{ base_path }}/admin/requests">← К списку</a>
   </div>
 
   <div class="card">
@@ -57,7 +57,7 @@
       {% if not manager %}
       <div class="alert alert-error">
         ⚠️ У сотрудника не назначен руководитель — уведомление о заявке никому не отправлено, и заявка не сможет продвинуться дальше.
-        Назначьте руководителя в <a href="/admin/users/{{ req.user_id }}">карточке сотрудника</a>.
+        Назначьте руководителя в <a href="{{ base_path }}/admin/users/{{ req.user_id }}">карточке сотрудника</a>.
       </div>
       {% endif %}
     {% endif %}
@@ -151,5 +151,5 @@
     const IS_CERT = {{ "true" if is_cert else "false" }};
     const IS_VACATION = {{ "true" if is_vacation else "false" }};
   </script>
-  <script src="/admin/static/requests_detail.js"></script>
+  <script src="{{ base_path }}/admin/static/requests_detail.js"></script>
 {% endblock %}

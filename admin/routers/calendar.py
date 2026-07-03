@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, extract
 
 from admin.templating import templates
-from admin.security import require_admin_page, require_admin_api
+from admin.gateway_auth import require_permission
 from admin.context import get_sidebar_badges
 from db.database import async_session
 from db.models import CalendarDay
@@ -22,7 +22,7 @@ def _day_to_dict(d: CalendarDay) -> dict:
 
 
 @router.get("/admin/calendar")
-async def calendar_list_page(request: Request, current_user=Depends(require_admin_page)):
+async def calendar_list_page(request: Request, current_user=Depends(require_permission("hr_bot.calendar.view"))):
     today = date.today()
     return templates.TemplateResponse(request, "calendar_list.html", {
         "active_page": "calendar",
@@ -33,7 +33,7 @@ async def calendar_list_page(request: Request, current_user=Depends(require_admi
 
 
 @router.get("/api/admin/calendar")
-async def api_calendar_list(year: Optional[int] = None, month: Optional[int] = None, current_user=Depends(require_admin_api)):
+async def api_calendar_list(year: Optional[int] = None, month: Optional[int] = None, current_user=Depends(require_permission("hr_bot.calendar.view"))):
     async with async_session() as session:
         stmt = select(CalendarDay)
         if year:
@@ -65,7 +65,7 @@ class BulkCreate(BaseModel):
 
 
 @router.post("/api/admin/calendar")
-async def api_calendar_create(payload: DayCreate, current_user=Depends(require_admin_api)):
+async def api_calendar_create(payload: DayCreate, current_user=Depends(require_permission("hr_bot.calendar.manage"))):
     async with async_session() as session:
         existing = (await session.execute(select(CalendarDay).where(CalendarDay.date == payload.date))).scalars().first()
         if existing:
@@ -76,12 +76,12 @@ async def api_calendar_create(payload: DayCreate, current_user=Depends(require_a
         await session.commit()
         await session.refresh(day)
 
-    action_logger.info("admin_calendar_day_created date=%s actor=%s", payload.date, current_user.login)
+    action_logger.info("admin_calendar_day_created date=%s actor=%s", payload.date, current_user.username)
     return _day_to_dict(day)
 
 
 @router.post("/api/admin/calendar/bulk")
-async def api_calendar_bulk_create(payload: BulkCreate, current_user=Depends(require_admin_api)):
+async def api_calendar_bulk_create(payload: BulkCreate, current_user=Depends(require_permission("hr_bot.calendar.manage"))):
     if payload.date_to < payload.date_from:
         raise HTTPException(status_code=400, detail="Дата «по» не может быть раньше даты «с»")
 
@@ -109,13 +109,13 @@ async def api_calendar_bulk_create(payload: BulkCreate, current_user=Depends(req
 
     action_logger.info(
         "admin_calendar_bulk_created date_from=%s date_to=%s created=%s actor=%s",
-        payload.date_from, payload.date_to, created, current_user.login
+        payload.date_from, payload.date_to, created, current_user.username
     )
     return {"created": created, "skipped": total_days - created}
 
 
 @router.patch("/api/admin/calendar/{day_id}")
-async def api_calendar_update(day_id: int, payload: DayUpdate, current_user=Depends(require_admin_api)):
+async def api_calendar_update(day_id: int, payload: DayUpdate, current_user=Depends(require_permission("hr_bot.calendar.manage"))):
     async with async_session() as session:
         day = await session.get(CalendarDay, day_id)
         if not day:
@@ -129,12 +129,12 @@ async def api_calendar_update(day_id: int, payload: DayUpdate, current_user=Depe
         await session.commit()
         await session.refresh(day)
 
-    action_logger.info("admin_calendar_day_updated day_id=%s actor=%s", day_id, current_user.login)
+    action_logger.info("admin_calendar_day_updated day_id=%s actor=%s", day_id, current_user.username)
     return _day_to_dict(day)
 
 
 @router.delete("/api/admin/calendar/{day_id}")
-async def api_calendar_delete(day_id: int, current_user=Depends(require_admin_api)):
+async def api_calendar_delete(day_id: int, current_user=Depends(require_permission("hr_bot.calendar.manage"))):
     async with async_session() as session:
         day = await session.get(CalendarDay, day_id)
         if not day:
@@ -142,5 +142,5 @@ async def api_calendar_delete(day_id: int, current_user=Depends(require_admin_ap
         await session.delete(day)
         await session.commit()
 
-    action_logger.info("admin_calendar_day_deleted day_id=%s actor=%s", day_id, current_user.login)
+    action_logger.info("admin_calendar_day_deleted day_id=%s actor=%s", day_id, current_user.username)
     return {"ok": True}

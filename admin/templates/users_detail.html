@@ -9,7 +9,7 @@
         {% if user.approval_status == "pending" %}<span class="badge badge-pending">Ожидает решения</span>{% endif %}
       </div>
     </div>
-    <a class="btn" href="/admin/users">← К списку</a>
+    <a class="btn" href="{{ base_path }}/admin/users">← К списку</a>
   </div>
 
   {% if user.approval_status == "pending" %}
@@ -76,26 +76,9 @@
     </form>
   </div>
 
-  {% if user.role == "hr" %}
-  <div class="card">
-    <h2>Доступ в админку</h2>
-    <p class="page-subtitle" style="margin-bottom:14px;">Логин и пароль для входа в эту веб-админку. Пароль оставьте пустым, если не хотите его менять.</p>
-    <form id="credentials-form">
-      <div class="form-row">
-        <label>Логин</label>
-        <input type="text" name="login" value="{{ user.login or '' }}" required>
-      </div>
-      <div class="form-row">
-        <label>Новый пароль</label>
-        <input type="password" name="password" placeholder="Оставьте пустым, чтобы не менять" autocomplete="new-password">
-        <div class="hint">Минимум 6 символов</div>
-      </div>
-      <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Сохранить доступ</button>
-      </div>
-    </form>
-  </div>
-  {% endif %}
+  {# Блок «Доступ в админку» (логин/пароль) удалён: доступ в веб-админку выдаёт
+     auth-service (роли сервиса hr_bot), а не эта карточка. Роль ниже — это роль
+     сотрудника В БОТЕ (employee/manager/hr), она к доступу в админку не относится. #}
 
   <div class="card">
     <h2>Служебная информация</h2>
@@ -114,5 +97,5 @@
   <script>
     const USER_ID = {{ user.id }};
   </script>
-  <script src="/admin/static/users_detail.js"></script>
+  <script src="{{ base_path }}/admin/static/users_detail.js"></script>
 {% endblock %}

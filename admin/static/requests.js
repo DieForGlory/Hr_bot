@@ -51,12 +51,12 @@ async function loadRequests() {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>№${r.id}</td>
-      <td><a href="/admin/users/${r.user_id}">${escapeHtml(r.employee_name)}</a></td>
+      <td><a href="${window.BASE_PATH}/admin/users/${r.user_id}">${escapeHtml(r.employee_name)}</a></td>
       <td>${escapeHtml(r.type_label)}</td>
       <td>${period}</td>
       <td><span class="badge ${statusBadgeClass(r.status)}">${escapeHtml(r.status_label)}</span></td>
       <td class="muted">${formatDate(r.created_at)}</td>
-      <td class="text-right"><a class="btn btn-ghost btn-sm" href="/admin/requests/${r.id}">Открыть</a></td>
+      <td class="text-right"><a class="btn btn-ghost btn-sm" href="${window.BASE_PATH}/admin/requests/${r.id}">Открыть</a></td>
     `;
     tbody.appendChild(tr);
   });

@@ -16,8 +16,8 @@
       <tbody>
         {% for t in items %}
         <tr>
-          <td><a href="/admin/templates/{{ t.id }}">{{ t.name }}</a></td>
-          <td class="text-right"><a class="btn btn-ghost btn-sm" href="/admin/templates/{{ t.id }}">Редактировать</a></td>
+          <td><a href="{{ base_path }}/admin/templates/{{ t.id }}">{{ t.name }}</a></td>
+          <td class="text-right"><a class="btn btn-ghost btn-sm" href="{{ base_path }}/admin/templates/{{ t.id }}">Редактировать</a></td>
         </tr>
         {% else %}
         <tr><td colspan="2" class="empty-state">Шаблонов пока нет</td></tr>

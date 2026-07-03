@@ -24,21 +24,8 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  const credForm = document.getElementById("credentials-form");
-  if (credForm) {
-    credForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const fd = new FormData(credForm);
-      const payload = { login: fd.get("login"), password: fd.get("password") || null };
-      try {
-        await apiFetch(`/api/admin/users/${USER_ID}/credentials`, { method: "POST", json: payload });
-        showToast("Доступ обновлён");
-        credForm.password.value = "";
-      } catch (e) {
-        showToast(humanizeError(e), "error");
-      }
-    });
-  }
+  // Блок «логин/пароль» удалён: доступ в админку теперь выдаёт auth-service (роли
+  // сервиса hr_bot), а не эта форма.
 
   const approveBtn = document.getElementById("btn-approve-reg");
   if (approveBtn) {

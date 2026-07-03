@@ -1,0 +1,23 @@
+# Hr_bot/Dockerfile.prod
+# ВАЖНО: build context — КОРЕНЬ репозитория (AnalyticsRepo), чтобы был доступен
+# общий пакет auth-connector. См. docker-compose.prod.yml (context: ..).
+FROM python:3.11-slim
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && update-ca-certificates && rm -rf /var/lib/apt/lists/*
+
+COPY Hr_bot/requirements.txt .
+RUN pip install --no-cache-dir --upgrade certifi \
+    && pip install --no-cache-dir -r requirements.txt
+
+# Общий auth-connector: регистрация в шлюзе + heartbeat + (для Flask) middleware.
+# Здесь используем только service discovery (FastAPI).
+COPY auth-connector /tmp/auth-connector
+RUN pip install --no-cache-dir --force-reinstall /tmp/auth-connector
+
+COPY Hr_bot/ .
+
+EXPOSE 8000
+# Дефолт — админка. Бот переопределяет command в compose (run_bot.py).
+CMD ["uvicorn", "run_admin:app", "--host", "0.0.0.0", "--port", "8000"]

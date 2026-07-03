@@ -13,10 +13,15 @@ async function apiFetch(url, options = {}) {
     delete opts.json;
   }
 
-  const res = await fetch(url, opts);
+  // Префикс шлюза (/hr_bot) — все относительные URL API проходят через apiFetch,
+  // поэтому достаточно добавить его здесь один раз.
+  const base = window.BASE_PATH || "";
+  const fullUrl = url.startsWith("/") ? base + url : url;
+  const res = await fetch(fullUrl, opts);
 
   if (res.status === 401) {
-    window.location.href = "/admin/login";
+    // Сессия шлюза истекла — на страницу входа шлюза (без префикса сервиса).
+    window.location.href = "/login";
     throw new Error("not_authenticated");
   }
 

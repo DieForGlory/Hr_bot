@@ -1,0 +1,88 @@
+# ===================================================================
+# PRODUCTION COMPOSE: hr_bot (Telegram-бот + веб-админка)
+# ===================================================================
+# Архитектура:
+#   - bot   — Telegram long-polling. Публичный «наружу» (к Telegram), входящего
+#             HTTP нет, роут в шлюзе не нужен. Требует ИСХОДЯЩИЙ интернет.
+#   - admin — FastAPI. Закрытый контур: доступен ТОЛЬКО через gateway под
+#             гранулярной авторизацией (auth_request + роли сервиса hr_bot).
+#             Регистрируется в шлюзе через auth-connector -> авто-роут /hr_bot/.
+#   Общаются через общий SQLite (том ./data) + Telegram.
+#
+# Запуск (build context = корень репозитория, нужен auth-connector):
+#   docker compose -f docker-compose.prod.yml up --build -d
+# ===================================================================
+
+services:
+  hr-bot:
+    build:
+      context: ..                       # корень репо — доступ к auth-connector
+      dockerfile: Hr_bot/Dockerfile.prod
+    image: hr-bot
+    container_name: hr-bot
+    restart: always
+    command: sh -c "python scripts/import_structure.py && python run_bot.py"
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Tashkent
+      # Единая БД для бота и админки (общий том ./data).
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/hr_bot.db
+    volumes:
+      - ./data:/app/data
+      - ./assets:/app/assets
+    networks:
+      - hr_bot_egress                   # только исходящий интернет (Telegram)
+    security_opt:
+      - no-new-privileges:true
+
+  hr-bot-admin:
+    build:
+      context: ..
+      dockerfile: Hr_bot/Dockerfile.prod
+    image: hr-bot                        # тот же образ, что и бот
+    container_name: hr-bot-admin
+    restart: always
+    command: sh -c "uvicorn run_admin:app --host 0.0.0.0 --port 8000"
+    depends_on:
+      - hr-bot
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Tashkent
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/hr_bot.db
+      # --- Интеграция со шлюзом ---
+      - ROOT_PATH=/hr_bot                # префикс за шлюзом (ссылки/редиректы/root_path)
+      - ENABLE_SERVICE_DISCOVERY=true
+      - SERVICE_KEY=hr_bot
+      - CONTAINER_NAME=hr-bot-admin
+      - SERVICE_INTERNAL_URL=http://hr-bot-admin:8000
+      - REGISTRY_URL=http://auth-service:80/api/registry
+      # X-API-Key для /api/* шлюза — совпадает с INTERNAL_API_KEY auth-service.
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:?INTERNAL_API_KEY is required (совпадает с ключом auth-service)}
+      - HEARTBEAT_INTERVAL=30
+    labels:
+      - "nginx.auth=true"
+    volumes:
+      - ./data:/app/data
+      - ./assets:/app/assets
+    networks:
+      - service_network                 # общая со шлюзом/auth-service (inbound + регистрация)
+      - hr_bot_egress                   # исходящий интернет (admin шлёт через Telegram)
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+networks:
+  # Внутренняя сеть сервисов (external, создаётся шлюзом; internal — без интернета).
+  service_network:
+    external: true
+    name: service_network
+  # Отдельный bridge с NAT в интернет — для Telegram.
+  hr_bot_egress:
+    driver: bridge

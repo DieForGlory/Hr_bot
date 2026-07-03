@@ -128,11 +128,6 @@ async def get_user_by_telegram_id(telegram_id: int):
         result = await session.execute(select(User).where(User.telegram_id == telegram_id))
         return result.scalars().first()
 
-async def get_user_by_login(login: str):
-    async with async_session() as session:
-        result = await session.execute(select(User).where(User.login == login))
-        return result.scalars().first()
-
 async def create_request(user_id: int, req_type: str, start_date=None, end_date=None, comment=None, days_count=None):
     async with async_session() as session:
         new_req = Request(

@@ -76,12 +76,12 @@ async function loadUsers() {
   items.forEach((u) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td><a href="/admin/users/${u.id}">${escapeHtml(u.full_name)}</a></td>
+      <td><a href="${window.BASE_PATH}/admin/users/${u.id}">${escapeHtml(u.full_name)}</a></td>
       <td>${escapeHtml(u.role_label)}</td>
       <td>${escapeHtml(u.department || "-")}</td>
       <td>${u.vacation_days_balance ?? "-"}</td>
       <td>${u.is_active ? '<span class="badge badge-success">Активен</span>' : '<span class="badge badge-neutral">Неактивен</span>'}</td>
-      <td class="text-right"><a class="btn btn-ghost btn-sm" href="/admin/users/${u.id}">Открыть</a></td>
+      <td class="text-right"><a class="btn btn-ghost btn-sm" href="${window.BASE_PATH}/admin/users/${u.id}">Открыть</a></td>
     `;
     tbody.appendChild(tr);
   });

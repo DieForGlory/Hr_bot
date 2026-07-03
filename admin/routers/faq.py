@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from admin.templating import templates
-from admin.security import require_admin_page, require_admin_api
+from admin.gateway_auth import require_permission
 from admin.context import get_sidebar_badges
 from db.database import async_session
 from db.models import FAQ
@@ -20,7 +20,7 @@ def _faq_to_dict(f: FAQ) -> dict:
 
 
 @router.get("/admin/faq")
-async def faq_list_page(request: Request, current_user=Depends(require_admin_page)):
+async def faq_list_page(request: Request, current_user=Depends(require_permission("hr_bot.faq.view"))):
     async with async_session() as session:
         items = (await session.execute(select(FAQ).order_by(FAQ.id))).scalars().all()
 
@@ -43,7 +43,7 @@ class FaqUpdate(BaseModel):
 
 
 @router.post("/api/admin/faq")
-async def api_faq_create(payload: FaqCreate, current_user=Depends(require_admin_api)):
+async def api_faq_create(payload: FaqCreate, current_user=Depends(require_permission("hr_bot.faq.manage"))):
     question = clean_text(payload.question, 500)
     answer = clean_text(payload.answer, 4000)
     if not question or not answer:
@@ -55,12 +55,12 @@ async def api_faq_create(payload: FaqCreate, current_user=Depends(require_admin_
         await session.commit()
         await session.refresh(faq)
 
-    action_logger.info("admin_faq_created faq_id=%s actor=%s", faq.id, current_user.login)
+    action_logger.info("admin_faq_created faq_id=%s actor=%s", faq.id, current_user.username)
     return _faq_to_dict(faq)
 
 
 @router.patch("/api/admin/faq/{faq_id}")
-async def api_faq_update(faq_id: int, payload: FaqUpdate, current_user=Depends(require_admin_api)):
+async def api_faq_update(faq_id: int, payload: FaqUpdate, current_user=Depends(require_permission("hr_bot.faq.manage"))):
     async with async_session() as session:
         faq = await session.get(FAQ, faq_id)
         if not faq:
@@ -80,12 +80,12 @@ async def api_faq_update(faq_id: int, payload: FaqUpdate, current_user=Depends(r
         await session.commit()
         await session.refresh(faq)
 
-    action_logger.info("admin_faq_updated faq_id=%s actor=%s", faq_id, current_user.login)
+    action_logger.info("admin_faq_updated faq_id=%s actor=%s", faq_id, current_user.username)
     return _faq_to_dict(faq)
 
 
 @router.delete("/api/admin/faq/{faq_id}")
-async def api_faq_delete(faq_id: int, current_user=Depends(require_admin_api)):
+async def api_faq_delete(faq_id: int, current_user=Depends(require_permission("hr_bot.faq.manage"))):
     async with async_session() as session:
         faq = await session.get(FAQ, faq_id)
         if not faq:
@@ -93,5 +93,5 @@ async def api_faq_delete(faq_id: int, current_user=Depends(require_admin_api)):
         await session.delete(faq)
         await session.commit()
 
-    action_logger.info("admin_faq_deleted faq_id=%s actor=%s", faq_id, current_user.login)
+    action_logger.info("admin_faq_deleted faq_id=%s actor=%s", faq_id, current_user.username)
     return {"ok": True}

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Request, Depends
 from sqlalchemy import func, select
 
 from admin.templating import templates
-from admin.security import require_admin_page
+from admin.gateway_auth import require_permission
 from admin.context import get_sidebar_badges
 from db.database import async_session
 from db.models import User, Request as HRRequest
@@ -41,7 +41,7 @@ def _read_last_log_lines(n: int = 20):
 
 
 @router.get("/admin")
-async def dashboard_page(request: Request, current_user=Depends(require_admin_page)):
+async def dashboard_page(request: Request, current_user=Depends(require_permission("hr_bot.dashboard.view"))):
     async with async_session() as session:
         pending_users = (await session.execute(
             select(func.count(User.id)).where(User.approval_status == "pending")

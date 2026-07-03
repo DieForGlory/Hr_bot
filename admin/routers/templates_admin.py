@@ -5,8 +5,8 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from admin.templating import templates
-from admin.security import require_admin_page, require_admin_api
+from admin.templating import templates, ROOT_PATH
+from admin.gateway_auth import require_permission
 from admin.context import get_sidebar_badges
 from db.database import async_session
 from db.models import DocumentTemplate
@@ -23,7 +23,7 @@ def _tpl_to_dict(t: DocumentTemplate) -> dict:
 
 
 @router.get("/admin/templates")
-async def templates_list_page(request: Request, current_user=Depends(require_admin_page)):
+async def templates_list_page(request: Request, current_user=Depends(require_permission("hr_bot.templates.view"))):
     async with async_session() as session:
         items = (await session.execute(select(DocumentTemplate).order_by(DocumentTemplate.name))).scalars().all()
 
@@ -37,11 +37,11 @@ async def templates_list_page(request: Request, current_user=Depends(require_adm
 
 
 @router.get("/admin/templates/{tpl_id}")
-async def template_detail_page(tpl_id: int, request: Request, current_user=Depends(require_admin_page)):
+async def template_detail_page(tpl_id: int, request: Request, current_user=Depends(require_permission("hr_bot.templates.view"))):
     async with async_session() as session:
         tpl = await session.get(DocumentTemplate, tpl_id)
     if not tpl:
-        return RedirectResponse(url="/admin/templates?error=Шаблон+не+найден", status_code=302)
+        return RedirectResponse(url=f"{ROOT_PATH}/admin/templates?error=Шаблон+не+найден", status_code=302)
 
     return templates.TemplateResponse(request, "templates_detail.html", {
         "active_page": "templates",
@@ -63,7 +63,7 @@ class TemplateUpdate(BaseModel):
 
 
 @router.post("/api/admin/templates")
-async def api_template_create(payload: TemplateCreate, current_user=Depends(require_admin_api)):
+async def api_template_create(payload: TemplateCreate, current_user=Depends(require_permission("hr_bot.templates.manage"))):
     name = clean_text(payload.name, 100)
     if not name:
         raise HTTPException(status_code=400, detail="Название шаблона обязательно")
@@ -74,12 +74,12 @@ async def api_template_create(payload: TemplateCreate, current_user=Depends(requ
         await session.commit()
         await session.refresh(tpl)
 
-    action_logger.info("admin_template_created template_id=%s actor=%s", tpl.id, current_user.login)
+    action_logger.info("admin_template_created template_id=%s actor=%s", tpl.id, current_user.username)
     return _tpl_to_dict(tpl)
 
 
 @router.patch("/api/admin/templates/{tpl_id}")
-async def api_template_update(tpl_id: int, payload: TemplateUpdate, current_user=Depends(require_admin_api)):
+async def api_template_update(tpl_id: int, payload: TemplateUpdate, current_user=Depends(require_permission("hr_bot.templates.manage"))):
     async with async_session() as session:
         tpl = await session.get(DocumentTemplate, tpl_id)
         if not tpl:
@@ -96,12 +96,12 @@ async def api_template_update(tpl_id: int, payload: TemplateUpdate, current_user
         await session.commit()
         await session.refresh(tpl)
 
-    action_logger.info("admin_template_updated template_id=%s actor=%s", tpl_id, current_user.login)
+    action_logger.info("admin_template_updated template_id=%s actor=%s", tpl_id, current_user.username)
     return _tpl_to_dict(tpl)
 
 
 @router.delete("/api/admin/templates/{tpl_id}")
-async def api_template_delete(tpl_id: int, current_user=Depends(require_admin_api)):
+async def api_template_delete(tpl_id: int, current_user=Depends(require_permission("hr_bot.templates.manage"))):
     async with async_session() as session:
         tpl = await session.get(DocumentTemplate, tpl_id)
         if not tpl:
@@ -109,5 +109,5 @@ async def api_template_delete(tpl_id: int, current_user=Depends(require_admin_ap
         await session.delete(tpl)
         await session.commit()
 
-    action_logger.info("admin_template_deleted template_id=%s actor=%s", tpl_id, current_user.login)
+    action_logger.info("admin_template_deleted template_id=%s actor=%s", tpl_id, current_user.username)
     return {"ok": True}

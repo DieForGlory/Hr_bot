@@ -6,8 +6,8 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import select, and_
 
-from admin.templating import templates
-from admin.security import require_admin_page, require_admin_api
+from admin.templating import templates, ROOT_PATH
+from admin.gateway_auth import require_permission
 from admin.context import get_sidebar_badges
 from admin.telegram_bot import bot
 from db.database import async_session
@@ -47,7 +47,7 @@ def _request_to_dict(r: HRRequest, employee: Optional[User] = None) -> dict:
 
 
 @router.get("/admin/requests")
-async def requests_list_page(request: Request, current_user=Depends(require_admin_page)):
+async def requests_list_page(request: Request, current_user=Depends(require_permission("hr_bot.requests.view"))):
     return templates.TemplateResponse(request, "requests_list.html", {
         "active_page": "requests",
         "current_user": current_user,
@@ -61,7 +61,7 @@ async def api_requests_list(
     type: Optional[str] = None, status: Optional[str] = None, user_id: Optional[int] = None,
     employee_search: Optional[str] = None,
     date_from: Optional[str] = None, date_to: Optional[str] = None,
-    current_user=Depends(require_admin_api),
+    current_user=Depends(require_permission("hr_bot.requests.view")),
 ):
     async with async_session() as session:
         stmt = select(HRRequest, User).join(User, HRRequest.user_id == User.id)
@@ -88,10 +88,10 @@ async def api_requests_list(
 
 
 @router.get("/admin/requests/{req_id}")
-async def request_detail_page(req_id: int, request: Request, current_user=Depends(require_admin_page)):
+async def request_detail_page(req_id: int, request: Request, current_user=Depends(require_permission("hr_bot.requests.view"))):
     req = await get_request_by_id(req_id)
     if not req:
-        return RedirectResponse(url="/admin/requests?error=Заявка+не+найдена", status_code=302)
+        return RedirectResponse(url=f"{ROOT_PATH}/admin/requests?error=Заявка+не+найдена", status_code=302)
     employee = await get_user_by_id(req.user_id)
     manager = await get_user_by_id(employee.manager_id) if employee and employee.manager_id else None
 
@@ -110,7 +110,7 @@ async def request_detail_page(req_id: int, request: Request, current_user=Depend
 
 
 @router.get("/api/admin/requests/{req_id}")
-async def api_request_detail(req_id: int, current_user=Depends(require_admin_api)):
+async def api_request_detail(req_id: int, current_user=Depends(require_permission("hr_bot.requests.view"))):
     req = await get_request_by_id(req_id)
     if not req:
         raise HTTPException(status_code=404, detail="Заявка не найдена")
@@ -127,7 +127,7 @@ class ReasonBody(BaseModel):
 
 
 @router.post("/api/admin/requests/{req_id}/approve")
-async def api_request_approve(req_id: int, payload: ApproveBody, current_user=Depends(require_admin_api)):
+async def api_request_approve(req_id: int, payload: ApproveBody, current_user=Depends(require_permission("hr_bot.requests.manage"))):
     req = await get_request_by_id(req_id)
     if not req:
         raise HTTPException(status_code=404, detail="Заявка не найдена")
@@ -154,7 +154,7 @@ async def api_request_approve(req_id: int, payload: ApproveBody, current_user=De
 
 
 @router.post("/api/admin/requests/{req_id}/reject")
-async def api_request_reject(req_id: int, payload: ReasonBody, current_user=Depends(require_admin_api)):
+async def api_request_reject(req_id: int, payload: ReasonBody, current_user=Depends(require_permission("hr_bot.requests.manage"))):
     req = await get_request_by_id(req_id)
     if not req:
         raise HTTPException(status_code=404, detail="Заявка не найдена")
@@ -182,7 +182,7 @@ async def api_request_reject(req_id: int, payload: ReasonBody, current_user=Depe
 
 
 @router.post("/api/admin/requests/{req_id}/cert-progress")
-async def api_cert_progress(req_id: int, current_user=Depends(require_admin_api)):
+async def api_cert_progress(req_id: int, current_user=Depends(require_permission("hr_bot.requests.manage"))):
     req = await get_request_by_id(req_id)
     if not req or req.type not in CERT_TYPES:
         raise HTTPException(status_code=404, detail="Заявка на справку не найдена")
@@ -201,7 +201,7 @@ async def api_cert_done(
     req_id: int,
     pickup_note: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
-    current_user=Depends(require_admin_api),
+    current_user=Depends(require_permission("hr_bot.requests.manage")),
 ):
     req = await get_request_by_id(req_id)
     if not req or req.type not in CERT_TYPES:
@@ -227,7 +227,7 @@ async def api_cert_done(
 
 
 @router.post("/api/admin/requests/{req_id}/cert-reject")
-async def api_cert_reject(req_id: int, payload: ReasonBody, current_user=Depends(require_admin_api)):
+async def api_cert_reject(req_id: int, payload: ReasonBody, current_user=Depends(require_permission("hr_bot.requests.manage"))):
     req = await get_request_by_id(req_id)
     if not req or req.type not in CERT_TYPES:
         raise HTTPException(status_code=404, detail="Заявка на справку не найдена")
