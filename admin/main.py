@@ -37,6 +37,15 @@ async def health():
     return {"status": "healthy"}
 
 
+@app.get("/api/sync/permissions")
+async def sync_permissions():
+    """Каталог разрешений сервиса для auth-service (кнопка «Синхронизировать»).
+    auth-service дёргает его напрямую по internal_url (без шлюза), поэтому без
+    require_permission. Формат ответа — как ждёт fetchServicePermissions."""
+    from admin.permissions import HR_BOT_PERMISSIONS
+    return {"success": True, "permissions": HR_BOT_PERMISSIONS}
+
+
 # --- Регистрация в gateway: service discovery + heartbeat ---
 # Только для admin (это HTTP-сервис системы). Non-fatal и опционально:
 # включается ENABLE_SERVICE_DISCOVERY=true (в prod-compose). Локально выключено.
