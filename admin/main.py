@@ -11,10 +11,12 @@ from admin.routers import dashboard, users, requests as requests_router, templat
 setup_logging()
 logger = logging.getLogger(__name__)
 
-# Префикс за шлюзом (/hr_bot). Локально пусто. Используется и в шаблонах (base_path).
-ROOT_PATH = os.getenv("ROOT_PATH", "").rstrip("/")
-
-app = FastAPI(title="HR Bot Admin", root_path=ROOT_PATH)
+# ВАЖНО: НЕ выставляем FastAPI(root_path=...). Шлюз срезает префикс /hr_bot
+# (rewrite ^/hr_bot/(.*) /$1), поэтому приложение получает пути уже БЕЗ префикса
+# (/admin/...). root_path заставил бы FastAPI ждать путь С префиксом -> 404 на
+# статике и роутах. Префикс для ССЫЛОК в шаблонах даёт base_path (ROOT_PATH в
+# templating.py) — это независимо от FastAPI root_path.
+app = FastAPI(title="HR Bot Admin")
 
 # Статика админки. Снаружи /hr_bot/admin/static/..., шлюз срезает /hr_bot ->
 # /admin/static/... (совпадает с этим mount).
