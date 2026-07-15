@@ -1,5 +1,5 @@
 import asyncio
-from db.database import engine, Base, async_session, seed_faq, seed_templates
+from db.database import engine, Base, async_session, seed_faq, seed_templates, seed_employees, run_migrations
 import db.models
 from core.logging_config import setup_logging
 
@@ -14,9 +14,13 @@ async def main():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+    # Лёгкие ALTER TABLE для новых колонок в существующих таблицах (SQLite).
+    await run_migrations()
+
     async with async_session() as session:
         await seed_faq(session)
         await seed_templates(session)
+        await seed_employees(session)
 
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()

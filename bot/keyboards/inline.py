@@ -2,6 +2,32 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from bot.locales.texts import get_text
 
+
+def get_org_nav_kb(current_dept, children, employees, lang: str = "ru") -> InlineKeyboardMarkup:
+    """Клавиатура навигации по оргструктуре при регистрации (п.7/8 ТЗ):
+    подпапки-подразделения + сотрудники текущего узла + Назад/«Меня нет в списке».
+    children — полные названия из COMPANY_STRUCTURE; employees — записи справочника."""
+    from bot.utils.constants import COMPANY_STRUCTURE
+    from bot.utils.org_hierarchy import display_name
+
+    rows = []
+    for child in children:
+        idx = COMPANY_STRUCTURE.index(child)
+        rows.append([InlineKeyboardButton(text="📂 " + display_name(child), callback_data=f"regnav:{idx}")])
+    for emp in employees:
+        rows.append([InlineKeyboardButton(text="👤 " + emp.full_name, callback_data=f"regpick:{emp.id}")])
+    if current_dept is not None:
+        rows.append([InlineKeyboardButton(text=get_text("reg_nav_back", lang), callback_data="regback")])
+        rows.append([InlineKeyboardButton(text=get_text("reg_not_in_list", lang), callback_data="regmanual")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def get_reg_self_confirm_kb(user_id: int, lang: str = "ru") -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=get_text("reg_self_confirm_yes", lang), callback_data=f"regconfirm:{user_id}")],
+        [InlineKeyboardButton(text=get_text("reg_nav_back", lang), callback_data="regback")],
+    ])
+
 def get_approval_keyboard(request_id: int, lang: str = "ru") -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=get_text("approve_button", lang), callback_data=f"approve_{request_id}")],
@@ -12,7 +38,9 @@ def get_approval_keyboard(request_id: int, lang: str = "ru") -> InlineKeyboardMa
 def get_vacation_types_kb(lang: str = "ru") -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=get_text("vacation_type_paid", lang), callback_data="vac_type_paid")],
-        [InlineKeyboardButton(text=get_text("vacation_type_unpaid", lang), callback_data="vac_type_unpaid")]
+        [InlineKeyboardButton(text=get_text("vacation_type_unpaid", lang), callback_data="vac_type_unpaid")],
+        [InlineKeyboardButton(text=get_text("vacation_type_marriage", lang), callback_data="vac_type_marriage")],
+        [InlineKeyboardButton(text=get_text("vacation_type_childbirth", lang), callback_data="vac_type_childbirth")],
     ])
 
 def get_confirm_kb(lang: str = "ru") -> InlineKeyboardMarkup:

@@ -9,9 +9,10 @@ from admin.templating import templates, ROOT_PATH
 from admin.gateway_auth import require_permission
 from admin.context import get_sidebar_badges
 from db.database import async_session
-from db.models import User
+from db.models import User, Request as HRRequest
 from bot.utils.db_api import get_user_by_id, resolve_manager_id, set_user_manager
 from bot.utils.constants import COMPANY_STRUCTURE
+from bot.utils.vacation_balance import balance_for_user
 from bot.utils.validators import clean_text
 from bot.services.request_actions import approve_registration, reject_registration, UserNotFound
 from admin.telegram_bot import bot
@@ -30,6 +31,8 @@ def _user_to_dict(u: User) -> dict:
         "manager_id": u.manager_id, "vacation_days_balance": u.vacation_days_balance,
         "is_active": u.is_active, "approval_status": u.approval_status,
         "language": u.language,
+        "hire_date": u.hire_date, "used_work_days": u.used_work_days,
+        "used_calendar_days": u.used_calendar_days,
     }
 
 
@@ -84,6 +87,8 @@ async def user_detail_page(user_id: int, request: Request, current_user=Depends(
             select(User).where(User.role.in_(["manager", "hr"])).order_by(User.full_name)
         )).scalars().all()
 
+    balance = balance_for_user(user)  # None, если не задана дата приёма
+
     return templates.TemplateResponse(request, "users_detail.html", {
         "active_page": "users",
         "current_user": current_user,
@@ -93,6 +98,7 @@ async def user_detail_page(user_id: int, request: Request, current_user=Depends(
         "managers": managers,
         "roles": ROLE_LABELS,
         "departments": COMPANY_STRUCTURE,
+        "balance": balance,
     })
 
 
@@ -104,6 +110,9 @@ class UserUpdate(BaseModel):
     manager_id: Optional[int] = None
     vacation_days_balance: Optional[int] = None
     is_active: Optional[bool] = None
+    hire_date: Optional[str] = None
+    used_work_days: Optional[float] = None
+    used_calendar_days: Optional[float] = None
 
 
 @router.patch("/api/admin/users/{user_id}")
@@ -124,6 +133,15 @@ async def api_user_update(user_id: int, payload: UserUpdate, current_user=Depend
 
     if "vacation_days_balance" in data and data["vacation_days_balance"] is not None and data["vacation_days_balance"] < 0:
         raise HTTPException(status_code=400, detail="Остаток отпускных дней не может быть отрицательным")
+
+    if data.get("hire_date"):
+        from bot.utils.vacation_balance import parse_hire_date
+        if parse_hire_date(data["hire_date"]) is None:
+            raise HTTPException(status_code=400, detail="Дата приёма должна быть в формате ДД.ММ.ГГГГ")
+
+    for f in ("used_work_days", "used_calendar_days"):
+        if f in data and data[f] is not None and data[f] < 0:
+            raise HTTPException(status_code=400, detail="Потраченные дни не могут быть отрицательными")
 
     async with async_session() as session:
         db_user = await session.get(User, user_id)
@@ -151,6 +169,45 @@ async def api_user_reject(user_id: int, current_user=Depends(require_permission(
     except UserNotFound:
         raise HTTPException(status_code=404, detail="Сотрудник не найден")
     return _user_to_dict(user)
+
+
+@router.delete("/api/admin/users/{user_id}/requests")
+async def api_user_clear_requests(user_id: int, current_user=Depends(require_permission("hr_bot.users.manage"))):
+    """Очистка истории взаимодействия сотрудника — удаление всех его заявок (п.6 ТЗ)."""
+    user = await get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Сотрудник не найден")
+    async with async_session() as session:
+        reqs = (await session.execute(select(HRRequest).where(HRRequest.user_id == user_id))).scalars().all()
+        count = len(reqs)
+        for r in reqs:
+            await session.delete(r)
+        await session.commit()
+    action_logger.info("admin_user_requests_cleared user_id=%s count=%s actor=%s", user_id, count, current_user.username)
+    return {"ok": True, "deleted": count}
+
+
+@router.delete("/api/admin/users/{user_id}")
+async def api_user_delete(user_id: int, current_user=Depends(require_permission("hr_bot.users.manage"))):
+    """Полное удаление пользователя вместе с его заявками (п.6 ТЗ).
+    Сотрудники, для которых этот пользователь был руководителем, остаются без
+    руководителя (manager_id обнуляется) — переназначьте вручную или «Пересчитать»."""
+    async with async_session() as session:
+        user = await session.get(User, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="Сотрудник не найден")
+        # заявки пользователя
+        reqs = (await session.execute(select(HRRequest).where(HRRequest.user_id == user_id))).scalars().all()
+        for r in reqs:
+            await session.delete(r)
+        # отвязать подчинённых
+        subordinates = (await session.execute(select(User).where(User.manager_id == user_id))).scalars().all()
+        for sub in subordinates:
+            sub.manager_id = None
+        await session.delete(user)
+        await session.commit()
+    action_logger.info("admin_user_deleted user_id=%s actor=%s", user_id, current_user.username)
+    return {"ok": True, "deleted": user_id}
 
 
 @router.post("/api/admin/users/{user_id}/recalculate-manager")

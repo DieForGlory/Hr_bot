@@ -68,14 +68,17 @@ async def _attach_and_forward(message: types.Message, user, req_id: int, lang: s
     await attach_sick_leave_document(req_id, file_id)
     action_logger.info("sick_leave_document_attached user_id=%s req_id=%s", user.id, req_id)
 
+    attachment_kind = "document" if message.document else "photo"
     hr_users = await get_users_by_role("hr")
+    from bot.utils.notify_window import dispatch_notification
     for hr in hr_users:
         if hr.telegram_id:
             caption = get_text("sick_leave_doc_forward_caption", hr.language).format(full_name=user.full_name)
-            if message.document:
-                await message.bot.send_document(hr.telegram_id, message.document.file_id, caption=caption)
-            else:
-                await message.bot.send_photo(hr.telegram_id, message.photo[-1].file_id, caption=caption)
+            await dispatch_notification(
+                message.bot, hr.telegram_id, caption, hr.language,
+                attachment={"kind": attachment_kind, "file_id": file_id},
+                context=f"sick_leave_doc req_id={req_id} hr_id={hr.id}",
+            )
 
     await message.answer(get_text("sick_document_received", lang))
 

@@ -37,15 +37,17 @@ async def process_question(message: types.Message, state: FSMContext):
 
     hr_users = await get_users_by_role("hr")
 
+    from bot.utils.notify_window import dispatch_notification
     for hr in hr_users:
         if hr.telegram_id:
-            kb = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text=get_text("hr_reply_button", hr.language), callback_data=f"hr_reply_{user.id}")]
-            ])
             text = get_text("hr_question_header", hr.language).format(
                 name=user.full_name, department=user.department, question=question
             )
-            await message.bot.send_message(hr.telegram_id, text, reply_markup=kb)
+            await dispatch_notification(
+                message.bot, hr.telegram_id, text, hr.language,
+                kb_kind="hr_reply", kb_ref_id=user.id,
+                context=f"hr_question user_id={user.id} hr_id={hr.id}",
+            )
 
     action_logger.info("hr_question_asked user_id=%s", user.id)
     await message.answer(get_text("hr_question_sent", user.language))

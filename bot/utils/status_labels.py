@@ -48,6 +48,8 @@ TYPE_LABELS = {
     "ru": {
         "vacation_paid": "Оплачиваемый отпуск",
         "vacation_unpaid": "Отпуск без содержания",
+        "vacation_marriage": "Отпуск в связи с бракосочетанием",
+        "vacation_childbirth": "Отпуск в связи с рождением ребенка",
         "income_cert": "Справка о доходах",
         "work_cert": "Справка с места работы",
         "sick_leave": "Больничный",
@@ -55,6 +57,8 @@ TYPE_LABELS = {
     "uz": {
         "vacation_paid": "Haq to'lanadigan ta'til",
         "vacation_unpaid": "Ish haqisiz ta'til",
+        "vacation_marriage": "Nikoh munosabati bilan ta'til",
+        "vacation_childbirth": "Bola tug'ilishi munosabati bilan ta'til",
         "income_cert": "Daromad to'g'risida ma'lumotnoma",
         "work_cert": "Ish joyidan ma'lumotnoma",
         "sick_leave": "Kasallik varaqasi",

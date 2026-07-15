@@ -15,6 +15,7 @@ from db.models import Request as HRRequest, User
 from bot.utils.db_api import get_request_by_id, get_user_by_id
 from bot.utils.status_labels import get_status_label, get_type_label, TYPE_LABELS
 from bot.utils.validators import clean_text, MAX_COMMENT_LEN
+from bot.utils.constants import VACATION_TYPES
 from bot.services.request_actions import (
     approve_request, reject_request, set_cert_status, send_cert_ready_notice,
     RequestNotFound, UserNotFound, CommentRequired, InvalidTransition,
@@ -24,7 +25,7 @@ from core.logging_config import action_logger
 router = APIRouter()
 
 CERT_TYPES = ("income_cert", "work_cert")
-VACATION_LIKE_TYPES = ("vacation_paid", "vacation_unpaid")
+VACATION_LIKE_TYPES = tuple(VACATION_TYPES)
 
 
 def _request_to_dict(r: HRRequest, employee: Optional[User] = None) -> dict:
@@ -224,6 +225,21 @@ async def api_cert_done(
 
     employee = await get_user_by_id(req.user_id)
     return _request_to_dict(req, employee)
+
+
+@router.delete("/api/admin/requests/{req_id}")
+async def api_request_delete(req_id: int, current_user=Depends(require_permission("hr_bot.requests.manage"))):
+    """Удаление тестовой/ошибочной заявки или зависшего статуса (п.6 ТЗ).
+    Удаляется только запись заявки; баланс отпускных при этом не восстанавливается
+    автоматически — при необходимости скорректируйте его вручную в карточке сотрудника."""
+    async with async_session() as session:
+        req = await session.get(HRRequest, req_id)
+        if not req:
+            raise HTTPException(status_code=404, detail="Заявка не найдена")
+        await session.delete(req)
+        await session.commit()
+    action_logger.info("admin_request_deleted req_id=%s actor=%s", req_id, current_user.username)
+    return {"ok": True, "deleted": req_id}
 
 
 @router.post("/api/admin/requests/{req_id}/cert-reject")

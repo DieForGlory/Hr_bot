@@ -64,8 +64,21 @@
         <div class="hint">«Пересчитать» подбирает руководителя автоматически по подразделению и должности (см. оргструктуру), либо назначьте вручную из списка выше.</div>
       </div>
       <div class="form-row">
-        <label>Остаток отпускных дней</label>
+        <label>Остаток отпускных дней (ручной, запасной)</label>
         <input type="number" name="vacation_days_balance" min="0" value="{{ user.vacation_days_balance }}">
+        <div class="hint">Используется, только если не задана дата приёма. При заданной дате приёма остаток считается по алгоритму (п.3).</div>
+      </div>
+      <div class="form-row">
+        <label>Дата приёма (ДД.ММ.ГГГГ)</label>
+        <input type="text" name="hire_date" value="{{ user.hire_date or '' }}" placeholder="дд.мм.гггг">
+      </div>
+      <div class="form-row">
+        <label>Потрачено рабочих дней (1-й период, до 30.04.2023)</label>
+        <input type="number" step="0.25" min="0" name="used_work_days" value="{{ user.used_work_days if user.used_work_days is not none else 0 }}">
+      </div>
+      <div class="form-row">
+        <label>Потрачено календарных дней (2-й период, с 01.05.2023)</label>
+        <input type="number" step="0.5" min="0" name="used_calendar_days" value="{{ user.used_calendar_days if user.used_calendar_days is not none else 0 }}">
       </div>
       <div class="form-row">
         <label><input type="checkbox" name="is_active" {{ "checked" if user.is_active else "" }} style="width:auto; margin-right:6px;">Активен (может пользоваться ботом)</label>
@@ -81,6 +94,27 @@
      сотрудника В БОТЕ (employee/manager/hr), она к доступу в админку не относится. #}
 
   <div class="card">
+    <h2>Остаток отпускных (расчёт по алгоритму Excel, п.3)</h2>
+    {% if balance %}
+    <table>
+      <tbody>
+        <tr><td class="muted">Начислено рабочих дней (1-й период)</td><td>{{ balance.accrued_work }}</td></tr>
+        <tr><td class="muted">Потрачено рабочих</td><td>{{ balance.used_work }}</td></tr>
+        <tr><td class="muted">Остаток рабочих дней</td><td>{{ balance.remaining_work }}</td></tr>
+        <tr><td class="muted">Начислено календарных дней (2-й период)</td><td>{{ balance.accrued_calendar }}</td></tr>
+        <tr><td class="muted">Потрачено календарных</td><td>{{ balance.used_calendar }}</td></tr>
+        <tr><td class="muted">Остаток календарных дней</td><td>{{ balance.remaining_calendar }}</td></tr>
+        <tr><td class="muted">Итого остаток</td><td><strong>{{ balance.total_remaining }}</strong></td></tr>
+        <tr><td class="muted">Доп. дни за стаж (справочно, не входят в остаток)</td><td>{{ balance.tenure_bonus }}</td></tr>
+      </tbody>
+    </table>
+    <div class="hint">Списание при согласовании оплачиваемого отпуска идёт из календарной корзины. Значения пересчитываются после сохранения даты приёма/потраченных дней.</div>
+    {% else %}
+    <div class="hint">Укажите дату приёма выше и сохраните, чтобы рассчитать остаток по алгоритму (п.3).</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
     <h2>Служебная информация</h2>
     <table>
       <tbody>
@@ -88,9 +122,24 @@
         <tr><td class="muted">Telegram</td><td>{{ ("@" + user.tg_username) if user.tg_username else "-" }} (id {{ user.telegram_id or "-" }})</td></tr>
         <tr><td class="muted">Дата рождения</td><td>{{ user.birth_date or "-" }}</td></tr>
         <tr><td class="muted">Автомобиль</td><td>{{ user.car_info or "-" }}</td></tr>
+        <tr><td class="muted">Кадровое состояние</td><td>{{ user.work_state or "-" }}</td></tr>
         <tr><td class="muted">Язык интерфейса</td><td>{{ user.language }}</td></tr>
       </tbody>
     </table>
+  </div>
+
+  <div class="card">
+    <h2>Заявки сотрудника</h2>
+    <div id="user-requests"><div class="muted">Загрузка…</div></div>
+  </div>
+
+  <div class="card" style="border:1px solid var(--danger, #d9534f);">
+    <h2 style="color: var(--danger, #d9534f);">Опасная зона</h2>
+    <p class="hint">Удаление тестовых/ошибочных заявок, очистка истории взаимодействия и удаление пользователя. Действия необратимы.</p>
+    <div class="form-actions">
+      <button class="btn btn-danger" id="btn-clear-history">Очистить историю заявок</button>
+      <button class="btn btn-danger" id="btn-delete-user">Удалить пользователя</button>
+    </div>
   </div>
 {% endblock %}
 {% block extra_scripts %}

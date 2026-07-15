@@ -1,5 +1,17 @@
 # bot/utils/constants.py
 
+# Все типы заявок-отпусков (обычные + специальные из п.4 ТЗ). Используется в
+# планировщике и там, где нужно отличить отпуск от справок/больничного.
+VACATION_TYPES = [
+    "vacation_paid",
+    "vacation_unpaid",
+    "vacation_marriage",    # отпуск в связи с бракосочетанием (п.4)
+    "vacation_childbirth",  # отпуск в связи с рождением ребенка (п.4)
+]
+
+# Специальные виды отпуска, требующие подтверждающих документов перед согласованием (п.4).
+VACATION_TYPES_REQUIRING_DOCS = ["vacation_marriage", "vacation_childbirth"]
+
 DEFAULT_VACATION_ORDER_TEMPLATE = (
     "[Наименование компании]\n\n"
     "ПРИКАЗ О ПРЕДОСТАВЛЕНИИ ОТПУСКА\n\n"

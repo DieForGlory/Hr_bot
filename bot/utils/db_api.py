@@ -7,7 +7,7 @@ from db.database import async_session
 from sqlalchemy.future import select
 from sqlalchemy import insert, update
 from db.models import FAQ
-from sqlalchemy import select, and_, extract
+from sqlalchemy import select, and_, extract, func
 from db.models import CalendarDay
 
 async def get_request_by_id(req_id: int):
@@ -75,12 +75,13 @@ async def update_request_status(req_id: int, status: str, hr_comment: str = None
             else:
                 values["hr_decided_at"] = datetime.now()
 
-        # Списываем баланс ровно один раз, при первом переходе в hr_approved
+        # Списываем остаток ровно один раз, при первом переходе в hr_approved.
+        # По алгоритму Excel (п.3) списание идёт из КАЛЕНДАРНОЙ корзины (used_calendar_days).
         if status == "hr_approved" and previous_status != "hr_approved" and req.type == "vacation_paid" and req.days_count:
             await session.execute(
                 update(User)
                 .where(User.id == req.user_id)
-                .values(vacation_days_balance=User.vacation_days_balance - req.days_count)
+                .values(used_calendar_days=func.coalesce(User.used_calendar_days, 0) + req.days_count)
             )
 
         await session.execute(update(Request).where(Request.id == req_id).values(**values))
@@ -128,7 +129,52 @@ async def get_user_by_telegram_id(telegram_id: int):
         result = await session.execute(select(User).where(User.telegram_id == telegram_id))
         return result.scalars().first()
 
-async def create_request(user_id: int, req_type: str, start_date=None, end_date=None, comment=None, days_count=None):
+
+async def get_directory_users_by_department(department: str):
+    """Незанятые записи справочника (импортированные сотрудники без Telegram)
+    в указанном подразделении — для выбора себя при регистрации (п.7 ТЗ)."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(User).where(
+                User.department == department,
+                User.approval_status == "directory",
+                User.telegram_id.is_(None),
+            ).order_by(User.full_name)
+        )
+        return result.scalars().all()
+
+
+async def department_has_directory_users(department: str) -> bool:
+    users = await get_directory_users_by_department(department)
+    return len(users) > 0
+
+
+async def claim_directory_user(user_id: int, telegram_id: int, tg_username, language: str,
+                               phone: str, car_info: str, face_id_photo: str) -> bool:
+    """«Занять» запись справочника: привязать Telegram и данные регистрации, перевести
+    в статус pending (ждёт подтверждения HR). Возвращает False, если запись уже занята
+    (гонка/повторный клик)."""
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.id == user_id))
+        user = result.scalars().first()
+        if not user or user.approval_status != "directory" or user.telegram_id is not None:
+            return False
+        await session.execute(
+            update(User).where(User.id == user_id).values(
+                telegram_id=telegram_id,
+                tg_username=tg_username,
+                language=language,
+                phone=phone,
+                car_info=car_info,
+                face_id_photo=face_id_photo,
+                approval_status="pending",
+                is_active=False,
+            )
+        )
+        await session.commit()
+        return True
+
+async def create_request(user_id: int, req_type: str, start_date=None, end_date=None, comment=None, days_count=None, file_path=None):
     async with async_session() as session:
         new_req = Request(
             user_id=user_id,
@@ -136,7 +182,8 @@ async def create_request(user_id: int, req_type: str, start_date=None, end_date=
             start_date=start_date,
             end_date=end_date,
             comment=comment,
-            days_count=days_count
+            days_count=days_count,
+            file_path=file_path,
         )
         session.add(new_req)
         await session.commit()

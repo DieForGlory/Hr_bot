@@ -51,8 +51,80 @@ def _build_parent_map() -> dict:
 _PARENT_MAP = _build_parent_map()
 
 
+def _build_children_map() -> dict:
+    children = {name: [] for name in COMPANY_STRUCTURE}
+    children[None] = []  # верхний уровень
+    for name in COMPANY_STRUCTURE:
+        parent = _PARENT_MAP.get(name)
+        children.setdefault(parent, []).append(name)
+    return children
+
+
+_CHILDREN_MAP = _build_children_map()
+
+
 def get_parent_department(department: str) -> str | None:
     return _PARENT_MAP.get(department)
+
+
+def get_children(department: str | None) -> list[str]:
+    """Дочерние подразделения. department=None -> верхний уровень оргструктуры."""
+    return list(_CHILDREN_MAP.get(department, []))
+
+
+def get_top_level_departments() -> list[str]:
+    return get_children(None)
+
+
+def is_known_department(department: str) -> bool:
+    return department in _PARENT_MAP
+
+
+def display_name(department: str) -> str:
+    """Название подразделения без номерного префикса — для показа пользователю."""
+    return _NUMBER_PREFIX_RE.sub("", department).strip() if department else department
+
+
+def classify_level(department: str) -> str:
+    """Тип уровня оргструктуры по названию — для расшифровки в заявлении (п.2 ТЗ)."""
+    name = display_name(department).lower()
+    if "департамент" in name:
+        return "Департамент"
+    if "управление" in name:
+        return "Управление"
+    if "группа" in name:
+        return "Группа"
+    if "отдел" in name:
+        return "Отдел"
+    if "руководство" in name:
+        return "Руководство"
+    return "Подразделение"
+
+
+def get_level_breakdown(department: str) -> list[tuple[str, str]]:
+    """Список (тип уровня, название) от верхнего уровня до подразделения сотрудника.
+    Например для 'Группа экономической аналитики':
+    [('Департамент','Финансовый департамент'), ('Отдел','Планово - экономический отдел'),
+     ('Группа','Группа экономической аналитики')]."""
+    return [(classify_level(node), display_name(node)) for node in get_department_path(department)]
+
+
+def get_department_path(department: str) -> list[str]:
+    """Цепочка подразделений от верхнего уровня до указанного (включительно).
+    Например '5.1.1 Отдел взаиморасчетов' -> ['5. Финансовый департамент',
+    '5.1 Управление бухгалтерского учета и отчетности', '5.1.1 Отдел взаиморасчетов'].
+    Для неизвестного подразделения возвращает [department]."""
+    if department not in _PARENT_MAP:
+        return [department] if department else []
+    chain = []
+    node = department
+    seen = set()
+    while node is not None and node not in seen:
+        chain.append(node)
+        seen.add(node)
+        node = _PARENT_MAP.get(node)
+    chain.reverse()
+    return chain
 
 
 def get_manager_department(department: str, is_manager_role: bool) -> str | None:

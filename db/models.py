@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, BigInteger, String, Text, Boolean, Date, ForeignKey, DateTime, func
+from sqlalchemy import Column, Integer, BigInteger, String, Text, Boolean, Date, Float, ForeignKey, DateTime, func
 from db.database import Base
 
 class User(Base):
@@ -20,6 +20,16 @@ class User(Base):
     car_info = Column(String, nullable=True)
     face_id_photo = Column(String, nullable=True)
     approval_status = Column(String, default="approved")
+    # Кадровое состояние из справочника (Excel): "Работа", "Отпуск основной",
+    # "Отпуск по уходу за ребенком", "Болезнь" и т.д. Для directory-записей
+    # (импортированных сотрудников, ещё не привязавших Telegram).
+    work_state = Column(String, nullable=True)
+    # Расчёт остатка отпускных по алгоритму Excel (п.3). Дата приёма — строкой
+    # "dd.mm.yyyy" (как birth_date). used_* — уже потраченные дни (рабочие/календарные,
+    # колонки S/T). Остаток вычисляется на лету в bot/utils/vacation_balance.py.
+    hire_date = Column(String, nullable=True)
+    used_work_days = Column(Float, default=0)
+    used_calendar_days = Column(Float, default=0)
     # Доступ в веб-админку теперь даёт gateway (auth-service, роли/разрешения сервиса
     # hr_bot). Собственная авторизация админки удалена — поля login/password_hash больше
     # не нужны.
@@ -63,3 +73,26 @@ class FAQ(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     question = Column(String)
     answer = Column(Text)
+
+
+class NotificationQueue(Base):
+    """Очередь отложенных уведомлений админам/согласующим лицам (п.5 ТЗ).
+
+    Уведомления, сгенерированные вне рабочего окна (08:00–19:00 пн–пт),
+    сохраняются здесь с scheduled_at = начало следующего рабочего окна и
+    отправляются планировщиком, когда окно открывается. Клавиатура не
+    сериализуется целиком — вместо этого храним её тип (kb_kind) и id заявки
+    (kb_ref_id), чтобы пересобрать её при отправке (callback_data не протухает).
+    """
+    __tablename__ = "notification_queue"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    chat_id = Column(BigInteger, nullable=False)
+    text = Column(Text, nullable=False)
+    attachment_kind = Column(String, nullable=True)   # 'photo' | 'document' | None
+    attachment_file_id = Column(String, nullable=True)
+    kb_kind = Column(String, nullable=True)           # 'approval' | 'cert' | 'registration' | None
+    kb_ref_id = Column(Integer, nullable=True)        # request_id или user_id (для registration)
+    lang = Column(String, default="ru")
+    scheduled_at = Column(DateTime, nullable=False)   # когда уведомление можно отправить
+    sent = Column(Boolean, default=False)
+    created_at = Column(DateTime, server_default=func.now())

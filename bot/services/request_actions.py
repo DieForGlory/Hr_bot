@@ -4,6 +4,8 @@
 Используется и Telegram-хендлерами (bot/handlers/*), и веб-админкой (admin/routers/*),
 чтобы действие "согласовать/отклонить/сменить статус" не дублировалось в двух местах.
 """
+from datetime import timedelta
+
 from aiogram.types import FSInputFile, BufferedInputFile
 
 from bot.utils.db_api import (
@@ -122,15 +124,14 @@ async def approve_request(bot, req_id: int, actor=None, comment: str = None):
         req = await get_request_by_id(req_id)
         action_logger.info("request_hr_approved req_id=%s actor=%s", req_id, _actor_label(actor))
 
-        pdf_path = await generate_vacation_pdf(
-            req.id, employee.full_name, req.start_date, req.end_date, req.type,
-            department=employee.department, days_count=req.days_count
-        )
+        pdf_path = await generate_vacation_pdf(req, employee)
 
         if employee.telegram_id:
+            # Дата возвращения = следующий календарный день после последнего дня отпуска (п.1 ТЗ)
+            return_date = (req.end_date + timedelta(days=1)).strftime('%d.%m.%Y') if req.end_date else "-"
             await safe_notify(bot.send_message(
                 employee.telegram_id,
-                get_text("vacation_approved_final", employee.language)
+                get_text("vacation_approved_final", employee.language).format(return_date=return_date)
             ), context=f"vacation_approved_final req_id={req_id}")
             document = FSInputFile(pdf_path)
             await safe_notify(bot.send_document(employee.telegram_id, document), context=f"vacation_pdf req_id={req_id}")

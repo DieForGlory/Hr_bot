@@ -1,11 +1,9 @@
 
 from aiogram import Bot
-from bot.keyboards.inline import get_approval_keyboard, get_cert_status_keyboard
 from bot.utils.db_api import get_user_by_id, get_users_by_role
-from bot.utils.notify import safe_notify
 from bot.utils.status_labels import get_type_label
+from bot.utils.notify_window import dispatch_notification
 from bot.locales.texts import get_text
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
 async def send_registration_to_hr(bot, user_id: int, data: dict):
@@ -24,24 +22,20 @@ async def send_registration_to_hr(bot, user_id: int, data: dict):
             birth_date=data['birth_date'],
             car_info=data['car_info'],
         )
-        kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=get_text("reg_approve_button", lang), callback_data=f"reg_approve_{user_id}")],
-            [InlineKeyboardButton(text=get_text("reg_reject_button", lang), callback_data=f"reg_reject_{user_id}")]
-        ])
-        await safe_notify(bot.send_photo(
-            chat_id=hr.telegram_id,
-            photo=data['face_id_photo'],
-            caption=text,
-            reply_markup=kb
-        ), context=f"send_registration_to_hr user_id={user_id} hr_id={hr.id}")
+        await dispatch_notification(
+            bot, hr.telegram_id, text, lang,
+            kb_kind="registration", kb_ref_id=user_id,
+            attachment={"kind": "photo", "file_id": data['face_id_photo']},
+            context=f"send_registration_to_hr user_id={user_id} hr_id={hr.id}",
+        )
 
 
 def _vacation_type_name(vac_type_key: str, lang: str) -> str:
-    key = "vacation_type_paid" if vac_type_key == "paid" else "vacation_type_unpaid"
-    return get_text(key, lang)
+    # vac_type_key — короткий ключ: paid/unpaid/marriage/childbirth
+    return get_text(f"vacation_type_{vac_type_key}", lang)
 
 
-async def notify_manager(bot: Bot, employee, req_id: int, data: dict):
+async def notify_manager(bot: Bot, employee, req_id: int, data: dict, document_file_id: str = None):
     if not employee.manager_id:
         return
     manager = await get_user_by_id(employee.manager_id)
@@ -56,15 +50,17 @@ async def notify_manager(bot: Bot, employee, req_id: int, data: dict):
             end=data['end_date'].strftime('%d.%m.%Y'),
             days=data['days_count'],
         )
-        await safe_notify(
-            bot.send_message(manager.telegram_id, text, reply_markup=get_approval_keyboard(req_id, lang)),
-            context=f"notify_manager req_id={req_id}"
+        attachment = {"kind": "document", "file_id": document_file_id} if document_file_id else None
+        await dispatch_notification(
+            bot, manager.telegram_id, text, lang,
+            kb_kind="approval", kb_ref_id=req_id, attachment=attachment,
+            context=f"notify_manager req_id={req_id}",
         )
 
 
 async def notify_hr_vacation_approved(bot: Bot, employee, req):
     hr_users = await get_users_by_role("hr")
-    vac_type_key = "paid" if req.type == "vacation_paid" else "unpaid"
+    vac_type_key = req.type.replace("vacation_", "")
 
     for hr in hr_users:
         if not hr.telegram_id:
@@ -79,9 +75,11 @@ async def notify_hr_vacation_approved(bot: Bot, employee, req):
             end=req.end_date.strftime('%d.%m.%Y'),
             comment=req.manager_comment or '-',
         )
-        await safe_notify(
-            bot.send_message(hr.telegram_id, text, reply_markup=get_approval_keyboard(req.id, lang)),
-            context=f"notify_hr_vacation_approved req_id={req.id} hr_id={hr.id}"
+        attachment = {"kind": "document", "file_id": req.file_path} if req.file_path else None
+        await dispatch_notification(
+            bot, hr.telegram_id, text, lang,
+            kb_kind="approval", kb_ref_id=req.id, attachment=attachment,
+            context=f"notify_hr_vacation_approved req_id={req.id} hr_id={hr.id}",
         )
 
 
@@ -100,7 +98,8 @@ async def route_certificate(bot: Bot, req_id: int, cert_req_type: str, employee,
             department=employee.department or '-',
             comment=comment or '-',
         )
-        await safe_notify(
-            bot.send_message(u.telegram_id, text, reply_markup=get_cert_status_keyboard(req_id, lang)),
-            context=f"route_certificate req_id={req_id} user_id={u.id}"
+        await dispatch_notification(
+            bot, u.telegram_id, text, lang,
+            kb_kind="cert", kb_ref_id=req_id,
+            context=f"route_certificate req_id={req_id} user_id={u.id}",
         )
