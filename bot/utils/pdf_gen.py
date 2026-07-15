@@ -101,19 +101,21 @@ async def generate_vacation_pdf(req, employee) -> str:
 
     # --- Статусы согласования ---
     section_title("Согласование")
+    # Этап руководителя. Согласующего берём из заявки (кто фактически решил);
+    # если не зафиксирован (старые заявки) — показываем текущего руководителя.
     manager = await get_user_by_id(employee.manager_id) if employee.manager_id else None
-    manager_name = manager.full_name if manager else "-"
+    manager_name = req.manager_approver or (manager.full_name if manager else "-")
 
-    # Этап руководителя
     if req.status == "rejected" and req.manager_decided_at and not req.hr_decided_at:
         manager_status = "Отклонено"
     elif req.manager_decided_at:
         manager_status = "Согласовано"
     else:
         manager_status = "Ожидает"
-    field(f"Руководитель ({manager_name})", f"{manager_status} — {_fmt_date(req.manager_decided_at, '%d.%m.%Y %H:%M')}")
+    field("Этап 1 — Руководитель", f"{manager_status} — {_fmt_date(req.manager_decided_at, '%d.%m.%Y %H:%M')}")
+    field("  Согласующий", manager_name)
     if req.manager_comment:
-        field("  Комментарий руководителя", req.manager_comment)
+        field("  Комментарий", req.manager_comment)
 
     # Этап HR
     if req.status == "rejected" and req.hr_decided_at:
@@ -122,9 +124,10 @@ async def generate_vacation_pdf(req, employee) -> str:
         hr_status = "Согласовано"
     else:
         hr_status = "Ожидает"
-    field("HR", f"{hr_status} — {_fmt_date(req.hr_decided_at, '%d.%m.%Y %H:%M')}")
+    field("Этап 2 — HR", f"{hr_status} — {_fmt_date(req.hr_decided_at, '%d.%m.%Y %H:%M')}")
+    field("  Согласующий", req.hr_approver or "-")
     if req.hr_comment:
-        field("  Комментарий HR", req.hr_comment)
+        field("  Комментарий", req.hr_comment)
 
     os.makedirs("data/pdfs", exist_ok=True)
     file_path = f"data/pdfs/vacation_order_{req.id}.pdf"

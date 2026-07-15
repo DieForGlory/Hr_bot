@@ -112,7 +112,8 @@ async def approve_request(bot, req_id: int, actor=None, comment: str = None):
         raise UserNotFound()
 
     if req.status == "pending":
-        await update_request_status(req_id, "manager_approved", manager_comment=comment)
+        await update_request_status(req_id, "manager_approved", manager_comment=comment,
+                                    actor_name=_actor_label(actor) if actor else None)
         req = await get_request_by_id(req_id)
         action_logger.info("request_manager_approved req_id=%s actor=%s", req_id, _actor_label(actor))
 
@@ -120,7 +121,8 @@ async def approve_request(bot, req_id: int, actor=None, comment: str = None):
         return req, "manager"
 
     elif req.status == "manager_approved":
-        await update_request_status(req_id, "hr_approved", hr_comment=comment)
+        await update_request_status(req_id, "hr_approved", hr_comment=comment,
+                                    actor_name=_actor_label(actor) if actor else None)
         req = await get_request_by_id(req_id)
         action_logger.info("request_hr_approved req_id=%s actor=%s", req_id, _actor_label(actor))
 
@@ -149,7 +151,8 @@ async def reject_request(bot, req_id: int, actor=None, comment: str = None):
         raise RequestNotFound()
     employee = await get_user_by_id(req.user_id)
 
-    await update_request_status(req_id, "rejected", hr_comment=comment)
+    await update_request_status(req_id, "rejected", hr_comment=comment,
+                                actor_name=_actor_label(actor) if actor else None)
     action_logger.info("request_rejected req_id=%s actor=%s", req_id, _actor_label(actor))
 
     if employee and employee.telegram_id:

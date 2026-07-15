@@ -38,12 +38,18 @@ def _user_to_dict(u: User) -> dict:
 
 @router.get("/admin/users")
 async def users_list_page(request: Request, current_user=Depends(require_permission("hr_bot.users.view"))):
+    async with async_session() as session:
+        managers = (await session.execute(
+            select(User).where(User.role.in_(["manager", "hr"])).order_by(User.full_name)
+        )).scalars().all()
+
     return templates.TemplateResponse(request, "users_list.html", {
         "active_page": "users",
         "current_user": current_user,
         "nav_badges": await get_sidebar_badges(),
         "roles": ROLE_LABELS,
         "departments": COMPANY_STRUCTURE,
+        "managers": managers,
     })
 
 
@@ -100,6 +106,75 @@ async def user_detail_page(user_id: int, request: Request, current_user=Depends(
         "departments": COMPANY_STRUCTURE,
         "balance": balance,
     })
+
+
+class UserCreate(BaseModel):
+    full_name: str
+    department: Optional[str] = None
+    position: Optional[str] = None
+    role: Optional[str] = "employee"
+    manager_id: Optional[int] = None
+    hire_date: Optional[str] = None
+    birth_date: Optional[str] = None
+    phone: Optional[str] = None
+
+
+@router.post("/api/admin/users")
+async def api_user_create(payload: UserCreate, current_user=Depends(require_permission("hr_bot.users.manage"))):
+    """Создание нового сотрудника в справочнике (п.7 ТЗ) с назначением места в
+    оргструктуре. Запись создаётся как directory-User (без Telegram, неактивна):
+    сотрудник затем находит себя в списке при регистрации в боте и «занимает» её."""
+    full_name = clean_text(payload.full_name, 100) if payload.full_name else None
+    if not full_name:
+        raise HTTPException(status_code=400, detail="Укажите ФИО сотрудника")
+
+    role = payload.role or "employee"
+    if role not in ROLE_LABELS:
+        raise HTTPException(status_code=400, detail="Некорректная роль")
+
+    if payload.department and payload.department not in COMPANY_STRUCTURE:
+        raise HTTPException(status_code=400, detail="Подразделение должно быть выбрано из оргструктуры")
+
+    if payload.hire_date:
+        from bot.utils.vacation_balance import parse_hire_date
+        if parse_hire_date(payload.hire_date) is None:
+            raise HTTPException(status_code=400, detail="Дата приёма должна быть в формате ДД.ММ.ГГГГ")
+
+    if payload.manager_id:
+        manager = await get_user_by_id(payload.manager_id)
+        if not manager or manager.role not in ("manager", "hr"):
+            raise HTTPException(status_code=400, detail="Указанный руководитель не найден")
+
+    async with async_session() as session:
+        duplicate = (await session.execute(
+            select(User).where(User.full_name == full_name)
+        )).scalars().first()
+        if duplicate:
+            raise HTTPException(status_code=409, detail="Сотрудник с таким ФИО уже есть в справочнике")
+
+        new_user = User(
+            full_name=full_name,
+            department=payload.department,
+            position=payload.position,
+            role=role,
+            manager_id=payload.manager_id,
+            hire_date=payload.hire_date,
+            birth_date=payload.birth_date,
+            phone=payload.phone,
+            approval_status="directory",
+            is_active=False,
+            telegram_id=None,
+            vacation_days_balance=0,
+            used_work_days=0,
+            used_calendar_days=0,
+            language="ru",
+        )
+        session.add(new_user)
+        await session.commit()
+        created_id = new_user.id
+
+    action_logger.info("admin_user_created user_id=%s actor=%s", created_id, current_user.username)
+    return _user_to_dict(await get_user_by_id(created_id))
 
 
 class UserUpdate(BaseModel):

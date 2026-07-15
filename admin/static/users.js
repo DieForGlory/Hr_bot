@@ -87,9 +87,56 @@ async function loadUsers() {
   });
 }
 
+// --- Создание сотрудника в справочнике (п.7 ТЗ) ---
+function setupCreateUser() {
+  const card = document.getElementById("create-card");
+  const toggleBtn = document.getElementById("btn-toggle-create");
+  const cancelBtn = document.getElementById("btn-cancel-create");
+  const form = document.getElementById("create-user-form");
+  if (!card || !toggleBtn || !form) return;
+
+  toggleBtn.addEventListener("click", () => {
+    card.style.display = card.style.display === "none" ? "block" : "none";
+  });
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", () => {
+      form.reset();
+      card.style.display = "none";
+    });
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const payload = {
+      full_name: (fd.get("full_name") || "").trim(),
+      department: fd.get("department") || null,
+      position: (fd.get("position") || "").trim() || null,
+      role: fd.get("role") || "employee",
+      manager_id: fd.get("manager_id") ? parseInt(fd.get("manager_id"), 10) : null,
+      hire_date: (fd.get("hire_date") || "").trim() || null,
+      birth_date: (fd.get("birth_date") || "").trim() || null,
+    };
+    if (!payload.full_name) {
+      showToast("Укажите ФИО сотрудника", "error");
+      return;
+    }
+    try {
+      const created = await apiFetch("/api/admin/users", { method: "POST", json: payload });
+      showToast(`Сотрудник «${created.full_name}» добавлен в справочник`);
+      form.reset();
+      card.style.display = "none";
+      loadUsers();
+    } catch (err) {
+      showToast(humanizeError(err), "error");
+    }
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   loadPending();
   loadUsers();
+  setupCreateUser();
   document.getElementById("btn-filter").addEventListener("click", loadUsers);
   document.getElementById("f-search").addEventListener("keydown", (e) => {
     if (e.key === "Enter") loadUsers();

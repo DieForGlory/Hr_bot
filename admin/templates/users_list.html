@@ -4,8 +4,63 @@
   <div class="page-header">
     <div>
       <h1>Сотрудники</h1>
-      <div class="page-subtitle">Список сотрудников и очередь новых регистраций</div>
+      <div class="page-subtitle">Справочник сотрудников и очередь новых регистраций</div>
     </div>
+    <button class="btn btn-primary" id="btn-toggle-create">+ Создать сотрудника</button>
+  </div>
+
+  <div class="card" id="create-card" style="display:none;">
+    <h2>Новый сотрудник в справочнике</h2>
+    <p class="hint">Сотрудник добавляется в справочник и занимает место в оргструктуре. Telegram привязывается позже: человек находит себя в списке при регистрации в боте.</p>
+    <form id="create-user-form">
+      <div class="form-row">
+        <label>ФИО *</label>
+        <input type="text" name="full_name" required placeholder="Фамилия Имя Отчество">
+      </div>
+      <div class="form-row">
+        <label>Подразделение (место в оргструктуре)</label>
+        <select name="department">
+          <option value="">—</option>
+          {% for d in departments %}
+            <option value="{{ d }}">{{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Должность</label>
+        <input type="text" name="position" placeholder="например, Начальник отдела">
+      </div>
+      <div class="form-row">
+        <label>Роль в системе</label>
+        <select name="role">
+          {% for key, label in roles.items() %}
+            <option value="{{ key }}" {{ "selected" if key == "employee" else "" }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Руководитель</label>
+        <select name="manager_id">
+          <option value="">— не назначен —</option>
+          {% for m in managers %}
+            <option value="{{ m.id }}">{{ m.full_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Дата приёма (ДД.ММ.ГГГГ)</label>
+        <input type="text" name="hire_date" placeholder="дд.мм.гггг">
+        <div class="hint">Нужна для автоматического расчёта остатка отпускных.</div>
+      </div>
+      <div class="form-row">
+        <label>Дата рождения (ДД.ММ.ГГГГ)</label>
+        <input type="text" name="birth_date" placeholder="дд.мм.гггг">
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Создать</button>
+        <button type="button" class="btn" id="btn-cancel-create">Отмена</button>
+      </div>
+    </form>
   </div>
 
   <div class="card" id="pending-card" style="display:none;">

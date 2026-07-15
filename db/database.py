@@ -36,6 +36,10 @@ _EXPECTED_COLUMNS = {
         "used_work_days": "FLOAT",
         "used_calendar_days": "FLOAT",
     },
+    "requests": {
+        "manager_approver": "VARCHAR",
+        "hr_approver": "VARCHAR",
+    },
 }
 
 

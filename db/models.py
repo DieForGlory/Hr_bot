@@ -57,6 +57,11 @@ class Request(Base):
     manager_comment = Column(String, nullable=True)
     manager_decided_at = Column(DateTime, nullable=True)
     hr_decided_at = Column(DateTime, nullable=True)
+    # Кто фактически принял решение на этапе (ФИО согласующего) — для блока
+    # «Согласование» в заявлении (п.2 ТЗ). Может отличаться от текущего
+    # руководителя сотрудника (например, решение принято HR через веб-админку).
+    manager_approver = Column(String, nullable=True)
+    hr_approver = Column(String, nullable=True)
     file_path = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 

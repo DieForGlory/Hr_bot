@@ -49,7 +49,8 @@ async def update_user_approval(user_id: int, status: str):
             .values(approval_status=status, is_active=is_active)
         )
         await session.commit()
-async def update_request_status(req_id: int, status: str, hr_comment: str = None, manager_comment: str = None):
+async def update_request_status(req_id: int, status: str, hr_comment: str = None, manager_comment: str = None,
+                                actor_name: str = None):
     from datetime import datetime
 
     async with async_session() as session:
@@ -65,15 +66,24 @@ async def update_request_status(req_id: int, status: str, hr_comment: str = None
         if manager_comment:
             values["manager_comment"] = manager_comment
 
+        # Фиксируем, кто принял решение на этапе (п.2 ТЗ — «согласующие лица»)
         if status == "manager_approved":
             values["manager_decided_at"] = datetime.now()
+            if actor_name:
+                values["manager_approver"] = actor_name
         elif status in ("hr_approved", "done"):
             values["hr_decided_at"] = datetime.now()
+            if actor_name:
+                values["hr_approver"] = actor_name
         elif status == "rejected":
             if previous_status == "pending":
                 values["manager_decided_at"] = datetime.now()
+                if actor_name:
+                    values["manager_approver"] = actor_name
             else:
                 values["hr_decided_at"] = datetime.now()
+                if actor_name:
+                    values["hr_approver"] = actor_name
 
         # Списываем остаток ровно один раз, при первом переходе в hr_approved.
         # По алгоритму Excel (п.3) списание идёт из КАЛЕНДАРНОЙ корзины (used_calendar_days).
