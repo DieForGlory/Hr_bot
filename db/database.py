@@ -78,6 +78,7 @@ async def seed_employees(db: AsyncSession):
     """
     from db.models import User
     from sqlalchemy.future import select as _select
+    from core.logging_config import action_logger
 
     path = os.getenv("EMPLOYEES_SEED_PATH", os.path.join("data", "employees_seed.json"))
     if not os.path.exists(path):
@@ -116,21 +117,59 @@ async def seed_employees(db: AsyncSession):
     if created:
         await db.commit()
 
-    # Второй проход: привязка руководителей по ФИО (только если ещё не задан).
+    # Второй проход по уже существующим записям: привязка руководителя и
+    # ДОЗАПОЛНЕНИЕ пустых полей из справочника.
+    #
+    # Дозаполнение нужно, потому что вставка выше пропускает существующих
+    # сотрудников (сверка по ФИО). Без него сотрудники, импортированные ДО
+    # появления данных по отпускам, так и остались бы без даты приёма — и остаток
+    # им бы не считался. Заполняем только пустое: правки HR в админке не трогаем.
     users = (await db.execute(_select(User))).scalars().all()
     by_name = {u.full_name: u for u in users}
     linked = 0
+    filled = 0
     for rec in records:
         emp = by_name.get(rec["full_name"])
-        mgr_name = rec.get("manager_name")
-        if not emp or not mgr_name or emp.manager_id is not None:
+        if not emp:
             continue
-        mgr = by_name.get(mgr_name)
-        if mgr and mgr.id != emp.id:
-            emp.manager_id = mgr.id
-            linked += 1
-    if linked:
+
+        mgr_name = rec.get("manager_name")
+        if mgr_name and emp.manager_id is None:
+            mgr = by_name.get(mgr_name)
+            if mgr and mgr.id != emp.id:
+                emp.manager_id = mgr.id
+                linked += 1
+
+        changed = False
+        # Данные по отпускам заполняем одним блоком: дата приёма — признак того,
+        # что их ещё не импортировали.
+        if emp.hire_date is None and rec.get("hire_date"):
+            emp.hire_date = rec["hire_date"]
+            emp.used_work_days = rec.get("used_work_days") or 0
+            emp.used_calendar_days = rec.get("used_calendar_days") or 0
+            emp.accrued_work_override = rec.get("accrued_work_override")
+            emp.accrued_calendar_override = rec.get("accrued_calendar_override")
+            changed = True
+        if emp.work_state is None and rec.get("work_state"):
+            emp.work_state = rec["work_state"]
+            changed = True
+        if not emp.position and rec.get("position"):
+            emp.position = rec["position"]
+            changed = True
+        if not emp.department and rec.get("department"):
+            emp.department = rec["department"]
+            changed = True
+        if not emp.birth_date and rec.get("birth_date"):
+            emp.birth_date = rec["birth_date"]
+            changed = True
+        if changed:
+            filled += 1
+
+    if linked or filled:
         await db.commit()
+    action_logger.info(
+        "employees_seed created=%s linked_managers=%s filled_existing=%s", created, linked, filled
+    )
 
 # Часть ответов ниже помечена как "уточняется" — нет исходных данных по расчётам
 # (декретные/больничные/аванс и т.д.), реальный текст должен предоставить HR перед запуском в прод.
