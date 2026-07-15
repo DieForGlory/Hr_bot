@@ -124,6 +124,32 @@ async def get_users_by_role(role: str):
         result = await session.execute(select(User).where(User.role == role))
         return result.scalars().all()
 
+
+async def get_user_by_full_name(full_name: str):
+    """Сотрудник по ФИО — нужен, чтобы подтянуть должность согласующего в заявление."""
+    if not full_name:
+        return None
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.full_name == full_name))
+        return result.scalars().first()
+
+
+async def find_user_by_position(position_substring: str):
+    """Первый сотрудник, в должности которого встречается подстрока (без учёта регистра).
+    Используется для поиска адресата заявления — генерального директора.
+
+    Фильтруем в Python, а не через SQL lower()/LIKE: встроенный lower() в SQLite
+    работает только с ASCII и кириллицу не приводит к нижнему регистру."""
+    if not position_substring:
+        return None
+    needle = position_substring.lower()
+    async with async_session() as session:
+        result = await session.execute(select(User).order_by(User.id))
+        for user in result.scalars().all():
+            if user.position and needle in user.position.lower():
+                return user
+    return None
+
 async def get_user_by_phone(phone: str):
     async with async_session() as session:
         result = await session.execute(select(User).where(User.phone.like(f"%{phone[-10:]}%")))
