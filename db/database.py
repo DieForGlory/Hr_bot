@@ -164,17 +164,23 @@ async def seed_faq(db: AsyncSession):
     await db.commit()
 
 
-async def seed_templates(db: AsyncSession):
-    """Создаёт дефолтный шаблон приказа об отпуске, чтобы его можно было редактировать в админке."""
+async def remove_legacy_vacation_template(db: AsyncSession):
+    """Удаляет устаревший шаблон «Отпуск» из справочника шаблонов.
+
+    Раньше заявление на отпуск собиралось из этого редактируемого шаблона. Теперь
+    оно формируется по утверждённым образцам (bot/utils/pdf_gen.py), а текст просьбы
+    берётся из VACATION_STATEMENT_TEXTS по типу отпуска. Шаблон ни на что не влиял,
+    но оставался в админке и вводил в заблуждение — поэтому убираем его (идемпотентно).
+    """
     from db.models import DocumentTemplate
     from sqlalchemy.future import select as _select
-    from bot.utils.constants import DEFAULT_VACATION_ORDER_TEMPLATE
 
     existing = (await db.execute(
         _select(DocumentTemplate).where(DocumentTemplate.name == "Отпуск")
-    )).scalars().first()
-    if existing:
+    )).scalars().all()
+    if not existing:
         return
 
-    db.add(DocumentTemplate(name="Отпуск", content=DEFAULT_VACATION_ORDER_TEMPLATE))
+    for tpl in existing:
+        await db.delete(tpl)
     await db.commit()

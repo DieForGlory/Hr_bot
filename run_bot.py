@@ -1,5 +1,8 @@
 import asyncio
-from db.database import engine, Base, async_session, seed_faq, seed_templates, seed_employees, run_migrations
+from db.database import (
+    engine, Base, async_session, seed_faq, seed_employees, run_migrations,
+    remove_legacy_vacation_template,
+)
 import db.models
 from core.logging_config import setup_logging
 
@@ -19,8 +22,9 @@ async def main():
 
     async with async_session() as session:
         await seed_faq(session)
-        await seed_templates(session)
         await seed_employees(session)
+        # Заявление больше не собирается из редактируемого шаблона — убираем его из админки
+        await remove_legacy_vacation_template(session)
 
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
