@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 MAX_COMMENT_LEN = 1000
 MAX_NAME_LEN = 100
 MAX_CAR_INFO_LEN = 100
+MAX_POSITION_LEN = 100
 MAX_QUESTION_LEN = 2000
 
 _NAME_RE = re.compile(r"^[A-Za-zА-Яа-яЁёʼ'`\-. ]+$")

@@ -10,6 +10,7 @@ scheduled_at = начало следующего рабочего окна и о
 Уведомления самому сотруднику (согласовано/отклонено/справка готова) НЕ проходят
 через это окно — они отправляются сразу.
 """
+import os
 from datetime import datetime, timedelta
 
 from sqlalchemy import update
@@ -77,6 +78,13 @@ async def _send_now(bot, chat_id, text, lang, kb_kind, kb_ref_id, attachment, co
     if kind == "document" and file_id:
         # документ отдельным сообщением, затем текст с клавиатурой согласования
         await safe_notify(bot.send_document(chat_id, file_id), context=context + " doc")
+    elif kind == "document_path" and file_id:
+        # файл с диска (например, сформированное PDF-заявление), а не Telegram file_id
+        if os.path.exists(file_id):
+            from aiogram.types import FSInputFile
+            await safe_notify(bot.send_document(chat_id, FSInputFile(file_id)), context=context + " doc")
+        else:
+            action_logger.warning("notification_file_missing path=%s context=%s", file_id, context)
     await safe_notify(bot.send_message(chat_id, text, reply_markup=kb), context=context)
 
 

@@ -15,6 +15,7 @@ async def send_registration_to_hr(bot, user_id: int, data: dict):
         lang = hr.language
         text = get_text("registration_notification_header", lang).format(
             full_name=data['full_name'],
+            position=data.get('position') or '-',
             subdivision=data['subdivision'],
             role_text=data['role_text'],
             phone=data['phone'],
@@ -80,6 +81,34 @@ async def notify_hr_vacation_approved(bot: Bot, employee, req):
             bot, hr.telegram_id, text, lang,
             kb_kind="approval", kb_ref_id=req.id, attachment=attachment,
             context=f"notify_hr_vacation_approved req_id={req.id} hr_id={hr.id}",
+        )
+
+
+async def send_vacation_statement_to_hr(bot: Bot, employee, req, pdf_path: str, return_date: str = "-"):
+    """Дублирует согласованное заявление администраторам (HR) — оно нужно им для
+    оформления приказа. Отправляется по тому же рабочему окну, что и остальные
+    уведомления админам (п.5)."""
+    hr_users = await get_users_by_role("hr")
+    vac_type_key = req.type.replace("vacation_", "")
+
+    for hr in hr_users:
+        if not hr.telegram_id:
+            continue
+        lang = hr.language
+        text = get_text("vacation_statement_for_hr", lang).format(
+            full_name=employee.full_name,
+            position=employee.position or '-',
+            department=employee.department or '-',
+            v_type=_vacation_type_name(vac_type_key, lang),
+            start=req.start_date.strftime('%d.%m.%Y') if req.start_date else '-',
+            end=req.end_date.strftime('%d.%m.%Y') if req.end_date else '-',
+            days=req.days_count if req.days_count is not None else '-',
+            return_date=return_date,
+        )
+        await dispatch_notification(
+            bot, hr.telegram_id, text, lang,
+            attachment={"kind": "document_path", "file_id": pdf_path},
+            context=f"vacation_statement_to_hr req_id={req.id} hr_id={hr.id}",
         )
 
 

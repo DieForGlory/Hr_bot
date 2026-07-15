@@ -40,6 +40,8 @@ TEXTS = {
         "reg_dept_no_employees": "В этом подразделении пока нет доступных для выбора сотрудников. Выберите другое подразделение или нажмите «Меня нет в списке».",
         "reg_already_claimed": "Эта запись уже занята другим пользователем. Пожалуйста, выберите себя заново.",
         "reg_manual_name_prompt": "Введите ФИО (по паспорту на латинице):",
+        "reg_position_prompt": "Укажите вашу должность (как в трудовом договоре):",
+        "reg_position_invalid": "Укажите должность текстом (до 100 символов).",
         "status_choose": "Укажите ваш статус:",
         "role_employee": "Сотрудник",
         "role_manager": "Руководитель",
@@ -153,13 +155,14 @@ TEXTS = {
         "approval_rejected_notified": "Заявка отклонена, сотрудник уведомлен.",
         "vacation_request_notification": "Заявка на отпуск\nФИО: {full_name}\nОтдел: {department}\nТип: {v_type}\nДаты: {start} - {end}\nКоличество дней: {days}",
         "vacation_hr_notification": "Согласовано руководителем. Заявка на отпуск\nФИО: {full_name}\nОтдел: {department}\nТип: {v_type}\nДаты: {start} - {end}\nКомментарий руководителя: {comment}",
+        "vacation_statement_for_hr": "📄 Заявление согласовано — для оформления приказа.\nСотрудник: {full_name}\nДолжность: {position}\nПодразделение: {department}\nТип: {v_type}\nПериод: {start} - {end}\nКоличество дней: {days}\nДата выхода на работу: {return_date}",
 
         # --- Регистрация: решение HR ---
         "reg_approve_button": "Одобрить",
         "reg_reject_button": "Отклонить",
         "reg_approved_admin_suffix": "\n\n✅ Одобрено",
         "reg_rejected_admin_suffix": "\n\n❌ Отклонено",
-        "registration_notification_header": "Новая заявка на регистрацию:\nФИО: {full_name}\nПодразделение: {subdivision}\nСтатус: {role_text}\nТелефон: {phone}\nUsername: @{tg_username}\nДата рождения: {birth_date}\nАвто: {car_info}",
+        "registration_notification_header": "Новая заявка на регистрацию:\nФИО: {full_name}\nДолжность: {position}\nПодразделение: {subdivision}\nСтатус: {role_text}\nТелефон: {phone}\nUsername: @{tg_username}\nДата рождения: {birth_date}\nАвто: {car_info}",
 
         # --- Справки: решение бухгалтерии/HR ---
         "cert_progress_button": "В работу",
@@ -212,6 +215,8 @@ TEXTS = {
         "reg_dept_no_employees": "Bu bo'linmada hozircha tanlash uchun xodimlar yo'q. Boshqa bo'linmani tanlang yoki «Men ro'yxatda yo'qman» tugmasini bosing.",
         "reg_already_claimed": "Bu yozuv allaqachon boshqa foydalanuvchi tomonidan band qilingan. Iltimos, o'zingizni qaytadan tanlang.",
         "reg_manual_name_prompt": "F.I.Sh.ni kiriting (pasportdagidek, lotin harflarida):",
+        "reg_position_prompt": "Lavozimingizni kiriting (mehnat shartnomasidagidek):",
+        "reg_position_invalid": "Lavozimni matn ko'rinishida kiriting (100 belgigacha).",
         "status_choose": "Maqomingizni ko'rsating:",
         "role_employee": "Xodim",
         "role_manager": "Rahbar",
@@ -325,13 +330,14 @@ TEXTS = {
         "approval_rejected_notified": "Ariza rad etildi, xodimga xabar berildi.",
         "vacation_request_notification": "Ta'til arizasi\nF.I.Sh.: {full_name}\nBo'lim: {department}\nTuri: {v_type}\nSanalar: {start} - {end}\nKunlar soni: {days}",
         "vacation_hr_notification": "Rahbar tomonidan tasdiqlandi. Ta'til arizasi\nF.I.Sh.: {full_name}\nBo'lim: {department}\nTuri: {v_type}\nSanalar: {start} - {end}\nRahbar izohi: {comment}",
+        "vacation_statement_for_hr": "📄 Ariza tasdiqlandi — buyruq rasmiylashtirish uchun.\nXodim: {full_name}\nLavozimi: {position}\nBo'linma: {department}\nTuri: {v_type}\nDavr: {start} - {end}\nKunlar soni: {days}\nIshga chiqish sanasi: {return_date}",
 
         # --- Ro'yxatdan o'tish: HR qarori ---
         "reg_approve_button": "Tasdiqlash",
         "reg_reject_button": "Rad etish",
         "reg_approved_admin_suffix": "\n\n✅ Tasdiqlandi",
         "reg_rejected_admin_suffix": "\n\n❌ Rad etildi",
-        "registration_notification_header": "Yangi ro'yxatdan o'tish arizasi:\nF.I.Sh.: {full_name}\nBo'linma: {subdivision}\nMaqomi: {role_text}\nTelefon: {phone}\nUsername: @{tg_username}\nTug'ilgan sana: {birth_date}\nAvtomobil: {car_info}",
+        "registration_notification_header": "Yangi ro'yxatdan o'tish arizasi:\nF.I.Sh.: {full_name}\nLavozimi: {position}\nBo'linma: {subdivision}\nMaqomi: {role_text}\nTelefon: {phone}\nUsername: @{tg_username}\nTug'ilgan sana: {birth_date}\nAvtomobil: {car_info}",
 
         # --- Ma'lumotnomalar: buxgalteriya/HR qarori ---
         "cert_progress_button": "Ishga olish",

@@ -12,7 +12,10 @@ from bot.utils.db_api import (
 from bot.handlers.main_menu import get_main_keyboard
 from bot.utils.constants import COMPANY_STRUCTURE
 from bot.utils.org_hierarchy import get_children, get_parent_department, get_department_path, display_name
-from bot.utils.validators import is_valid_full_name, is_valid_birth_date, to_date, clean_text, MAX_CAR_INFO_LEN
+from bot.utils.validators import (
+    is_valid_full_name, is_valid_birth_date, to_date, clean_text,
+    MAX_CAR_INFO_LEN, MAX_POSITION_LEN,
+)
 from bot.keyboards.reply import get_role_kb
 from bot.keyboards.inline import get_org_nav_kb, get_reg_self_confirm_kb
 from bot.utils.routing import send_registration_to_hr
@@ -31,6 +34,7 @@ class RegistrationState(StatesGroup):
     navigating = State()        # навигация по оргструктуре / выбор себя (п.7/8)
     confirm_self = State()      # подтверждение выбранной записи справочника
     manual_full_name = State()  # ручная регистрация («Меня нет в списке»)
+    manual_position = State()
     manual_role = State()
     manual_birth = State()
     car_info = State()          # общий шаг (claim + manual)
@@ -264,14 +268,34 @@ async def process_manual_full_name(message: types.Message, state: FSMContext):
         await message.answer(get_text("invalid_full_name", lang))
         return
     await state.update_data(full_name=full_name)
-    await message.answer(get_text("status_choose", lang), reply_markup=get_role_kb(lang))
-    await state.set_state(RegistrationState.manual_role)
+    await message.answer(get_text("reg_position_prompt", lang))
+    await state.set_state(RegistrationState.manual_position)
 
 
 @router.message(RegistrationState.manual_full_name)
 async def process_manual_full_name_invalid(message: types.Message, state: FSMContext):
     lang = (await state.get_data()).get("chosen_language", "ru")
     await message.answer(get_text("only_text_allowed", lang))
+
+
+@router.message(RegistrationState.manual_position, F.text)
+async def process_manual_position(message: types.Message, state: FSMContext):
+    lang = (await state.get_data()).get("chosen_language", "ru")
+    position = clean_text(message.text, MAX_POSITION_LEN)
+    if not position:
+        await message.answer(get_text("reg_position_invalid", lang))
+        return
+    # Должность — реальное название из трудового договора; статус (Сотрудник/
+    # Руководитель) спрашиваем отдельно и храним только в роли.
+    await state.update_data(position=position)
+    await message.answer(get_text("status_choose", lang), reply_markup=get_role_kb(lang))
+    await state.set_state(RegistrationState.manual_role)
+
+
+@router.message(RegistrationState.manual_position)
+async def process_manual_position_invalid(message: types.Message, state: FSMContext):
+    lang = (await state.get_data()).get("chosen_language", "ru")
+    await message.answer(get_text("reg_position_invalid", lang))
 
 
 @router.message(
@@ -373,6 +397,7 @@ async def process_photo(message: types.Message, state: FSMContext):
         role_text_ru = get_text("role_manager", "ru") if user.role == "manager" else get_text("role_employee", "ru")
         reg_data = {
             "full_name": user.full_name,
+            "position": user.position or "-",
             "subdivision": user.department or "-",
             "role_text": role_text_ru,
             "phone": user.phone,

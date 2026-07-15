@@ -39,8 +39,9 @@
         </select>
       </div>
       <div class="form-row">
-        <label>Должность / статус</label>
+        <label>Должность</label>
         <input type="text" name="position" value="{{ user.position or '' }}">
+        <div class="hint">Реальная должность из трудового договора — попадает в заявление на отпуск. Статус «Сотрудник/Руководитель» задаётся полем «Роль в системе».</div>
       </div>
       <div class="form-row">
         <label>Роль в системе</label>

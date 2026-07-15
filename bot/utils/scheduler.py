@@ -6,6 +6,7 @@ from db.models import Request, User
 from aiogram import Bot
 from bot.locales.texts import get_text
 from bot.utils.constants import VACATION_TYPES
+from bot.utils.db_api import next_working_day
 from bot.utils.notify_window import flush_due_notifications
 from core.logging_config import action_logger
 
@@ -37,7 +38,7 @@ async def check_vacations_starting_today(bot: Bot):
 
 async def check_vacations_last_day(bot: Bot):
     """В последний день отпуска напоминаем сотруднику о выходе на работу (п.1 ТЗ).
-    Первый рабочий день = следующий календарный день после последнего дня отпуска."""
+    Первый рабочий день считается с учётом выходных и производственного календаря."""
     today = date.today()
     async with async_session() as session:
         result = await session.execute(
@@ -52,7 +53,7 @@ async def check_vacations_last_day(bot: Bot):
     for req, user in records:
         if not user.telegram_id:
             continue
-        return_date = (req.end_date + timedelta(days=1)).strftime('%d.%m.%Y')
+        return_date = (await next_working_day(req.end_date)).strftime('%d.%m.%Y')
         try:
             await bot.send_message(
                 user.telegram_id,

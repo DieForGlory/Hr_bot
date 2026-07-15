@@ -18,7 +18,8 @@ async def get_request_by_id(req_id: int):
 
 async def create_pending_user(data: dict) -> int:
     async with async_session() as session:
-        # Установка системных прав на основе выбранного статуса
+        # Статус (Сотрудник/Руководитель) определяет только системную роль.
+        # В position хранится РЕАЛЬНАЯ должность — она попадает в заявление на отпуск.
         sys_role = "manager" if data['role_text'] == "Руководитель" else "employee"
 
         new_user = User(
@@ -27,7 +28,7 @@ async def create_pending_user(data: dict) -> int:
             full_name=data['full_name'],
             tg_username=data['tg_username'],
             department=data['subdivision'],  # Сохраняем выбранное подразделение
-            position=data['role_text'],  # Сохраняем текстовый статус (Сотрудник/Руководитель)
+            position=data.get('position'),
             role=sys_role,  # Устанавливаем системную роль
             birth_date=data['birth_date'],
             car_info=data['car_info'],
@@ -279,6 +280,33 @@ async def resolve_manager_id(department: str, role: str):
 
     head = await find_department_head(manager_department)
     return head.id if head else None
+
+
+async def is_working_day(day) -> bool:
+    """Рабочий ли день. Запись в производственном календаре переопределяет обычное
+    правило «сб/вс — выходные»: is_workday=True — рабочий (перенос с выходного),
+    is_workday=False — нерабочий (праздник). Нет записи — обычная рабочая неделя."""
+    async with async_session() as session:
+        result = await session.execute(select(CalendarDay).where(CalendarDay.date == day))
+        record = result.scalars().first()
+    if record is not None:
+        return bool(record.is_workday)
+    return day.weekday() < 5  # пн-пт
+
+
+async def next_working_day(after):
+    """Первый рабочий день ПОСЛЕ указанной даты — с учётом выходных и праздников.
+    Нужен для даты выхода из отпуска (п.1 ТЗ): если последний день отпуска пришёлся
+    на пятницу или предпраздничный день, выходить сотрудник будет не назавтра."""
+    from datetime import timedelta
+
+    day = after + timedelta(days=1)
+    # Ограничение на случай, если календарь заполнен некорректно (сплошные выходные)
+    for _ in range(60):
+        if await is_working_day(day):
+            return day
+        day += timedelta(days=1)
+    return after + timedelta(days=1)
 
 
 async def get_calendar_days_for_month(year: int, month: int):

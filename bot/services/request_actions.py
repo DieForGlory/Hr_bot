@@ -4,16 +4,14 @@
 Используется и Telegram-хендлерами (bot/handlers/*), и веб-админкой (admin/routers/*),
 чтобы действие "согласовать/отклонить/сменить статус" не дублировалось в двух местах.
 """
-from datetime import timedelta
-
 from aiogram.types import FSInputFile, BufferedInputFile
 
 from bot.utils.db_api import (
     get_request_by_id, update_request_status, get_user_by_id, update_user_approval,
-    resolve_manager_id, set_user_manager,
+    resolve_manager_id, set_user_manager, next_working_day,
 )
 from bot.utils.pdf_gen import generate_vacation_pdf
-from bot.utils.routing import notify_hr_vacation_approved
+from bot.utils.routing import notify_hr_vacation_approved, send_vacation_statement_to_hr
 from bot.utils.notify import safe_notify
 from bot.locales.texts import get_text
 from core.logging_config import action_logger
@@ -128,15 +126,23 @@ async def approve_request(bot, req_id: int, actor=None, comment: str = None):
 
         pdf_path = await generate_vacation_pdf(req, employee)
 
+        # Дата выхода = первый РАБОЧИЙ день после последнего дня отпуска (п.1 ТЗ):
+        # если отпуск кончается в пятницу или перед праздником, выход позже.
+        return_date = (await next_working_day(req.end_date)).strftime('%d.%m.%Y') if req.end_date else "-"
+
         if employee.telegram_id:
-            # Дата возвращения = следующий календарный день после последнего дня отпуска (п.1 ТЗ)
-            return_date = (req.end_date + timedelta(days=1)).strftime('%d.%m.%Y') if req.end_date else "-"
             await safe_notify(bot.send_message(
                 employee.telegram_id,
                 get_text("vacation_approved_final", employee.language).format(return_date=return_date)
             ), context=f"vacation_approved_final req_id={req_id}")
             document = FSInputFile(pdf_path)
             await safe_notify(bot.send_document(employee.telegram_id, document), context=f"vacation_pdf req_id={req_id}")
+
+        # Дубликат заявления администраторам (HR) — нужен для оформления приказа
+        await safe_notify(
+            send_vacation_statement_to_hr(bot, employee, req, pdf_path, return_date),
+            context=f"statement_to_hr req_id={req_id}"
+        )
         return req, "hr"
 
     raise InvalidTransition(f"cannot approve request in status={req.status}")
