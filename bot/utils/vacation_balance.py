@@ -72,28 +72,45 @@ class VacationBalance:
     remaining_calendar: float  # V — остаток календарных дней
     tenure_bonus: float        # M — доп. дни за стаж (+2 за каждые 5 лет)
     total_remaining: float     # U + V (суммарный остаток дней)
+    accrual_frozen: bool = False  # начисление задано снимком, а не считается от даты приёма
 
 
 def compute_vacation_balance(hire_date: date, used_work: float = 0.0,
-                             used_calendar: float = 0.0, today: date | None = None) -> VacationBalance:
+                             used_calendar: float = 0.0, today: date | None = None,
+                             accrued_work_override: float | None = None,
+                             accrued_calendar_override: float | None = None) -> VacationBalance:
     """Считает остаток отпускных по алгоритму Excel.
 
     hire_date — дата приёма; used_work/used_calendar — уже потраченные дни
-    (рабочие/календарные); today — точка расчёта (по умолчанию сегодня)."""
+    (рабочие/календарные); today — точка расчёта (по умолчанию сегодня).
+
+    accrued_*_override — «замороженное» начисление. Нужно для сотрудников с
+    нестандартным периодом начисления (отпуск по уходу за ребёнком и т.п.): в
+    кадровом Excel период начисления таким сотрудникам обрезают вручную (до даты
+    ухода) или разбивают на отрезки, и вывести его из одной даты приёма нельзя.
+    Для них начисленные дни задаются снимком и не растут сами — пока HR не
+    обновит значение.
+    """
     if today is None:
         today = date.today()
 
     used_work = used_work or 0.0
     used_calendar = used_calendar or 0.0
 
-    # 1-й период: от даты приёма до 30.04.2023 (только если принят до этой даты)
-    months1 = _months_rounded(hire_date, PERIOD1_END) if hire_date < PERIOD1_END else 0
-    accrued_work = round(months1 * RATE_WORK, 2)
+    if accrued_work_override is None:
+        # 1-й период: от даты приёма до 30.04.2023 (только если принят до этой даты)
+        months1 = _months_rounded(hire_date, PERIOD1_END) if hire_date < PERIOD1_END else 0
+        accrued_work = round(months1 * RATE_WORK, 2)
+    else:
+        accrued_work = round(float(accrued_work_override), 2)
 
-    # 2-й период: от max(приём, 01.05.2023) до сегодня
-    period2_start = hire_date if hire_date > PERIOD2_START else PERIOD2_START
-    months2 = _months_rounded(period2_start, today)
-    accrued_calendar = round(months2 * RATE_CALENDAR, 2)
+    if accrued_calendar_override is None:
+        # 2-й период: от max(приём, 01.05.2023) до сегодня
+        period2_start = hire_date if hire_date > PERIOD2_START else PERIOD2_START
+        months2 = _months_rounded(period2_start, today)
+        accrued_calendar = round(months2 * RATE_CALENDAR, 2)
+    else:
+        accrued_calendar = round(float(accrued_calendar_override), 2)
 
     remaining_work = round(accrued_work - used_work, 2)
     remaining_calendar = round(accrued_calendar - used_calendar, 2)
@@ -109,6 +126,7 @@ def compute_vacation_balance(hire_date: date, used_work: float = 0.0,
         remaining_calendar=remaining_calendar,
         tenure_bonus=float(tenure_bonus),
         total_remaining=round(remaining_work + remaining_calendar, 2),
+        accrual_frozen=accrued_work_override is not None or accrued_calendar_override is not None,
     )
 
 
@@ -138,4 +156,6 @@ def balance_for_user(user, today: date | None = None) -> VacationBalance | None:
         used_work=getattr(user, "used_work_days", 0) or 0.0,
         used_calendar=getattr(user, "used_calendar_days", 0) or 0.0,
         today=today,
+        accrued_work_override=getattr(user, "accrued_work_override", None),
+        accrued_calendar_override=getattr(user, "accrued_calendar_override", None),
     )

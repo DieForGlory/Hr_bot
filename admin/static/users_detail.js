@@ -17,6 +17,9 @@ document.addEventListener("DOMContentLoaded", () => {
         hire_date: fd.get("hire_date") ? fd.get("hire_date").trim() : null,
         used_work_days: fd.get("used_work_days") !== "" ? parseFloat(fd.get("used_work_days")) : null,
         used_calendar_days: fd.get("used_calendar_days") !== "" ? parseFloat(fd.get("used_calendar_days")) : null,
+        // пусто -> null: вернуть автоматический расчёт начисления от даты приёма
+        accrued_work_override: fd.get("accrued_work_override") !== "" ? parseFloat(fd.get("accrued_work_override")) : null,
+        accrued_calendar_override: fd.get("accrued_calendar_override") !== "" ? parseFloat(fd.get("accrued_calendar_override")) : null,
       };
       try {
         await apiFetch(`/api/admin/users/${USER_ID}`, { method: "PATCH", json: payload });

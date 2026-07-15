@@ -35,6 +35,8 @@ _EXPECTED_COLUMNS = {
         "hire_date": "VARCHAR",
         "used_work_days": "FLOAT",
         "used_calendar_days": "FLOAT",
+        "accrued_work_override": "FLOAT",
+        "accrued_calendar_override": "FLOAT",
     },
     "requests": {
         "manager_approver": "VARCHAR",
@@ -98,6 +100,12 @@ async def seed_employees(db: AsyncSession):
             role=rec.get("role", "employee"),
             birth_date=rec.get("birth_date"),
             work_state=rec.get("work_state"),
+            # Данные для расчёта остатка отпускных (п.3)
+            hire_date=rec.get("hire_date"),
+            used_work_days=rec.get("used_work_days") or 0,
+            used_calendar_days=rec.get("used_calendar_days") or 0,
+            accrued_work_override=rec.get("accrued_work_override"),
+            accrued_calendar_override=rec.get("accrued_calendar_override"),
             approval_status="directory",
             is_active=False,
             telegram_id=None,

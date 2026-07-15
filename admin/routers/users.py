@@ -33,6 +33,8 @@ def _user_to_dict(u: User) -> dict:
         "language": u.language,
         "hire_date": u.hire_date, "used_work_days": u.used_work_days,
         "used_calendar_days": u.used_calendar_days,
+        "accrued_work_override": u.accrued_work_override,
+        "accrued_calendar_override": u.accrued_calendar_override,
     }
 
 
@@ -188,6 +190,8 @@ class UserUpdate(BaseModel):
     hire_date: Optional[str] = None
     used_work_days: Optional[float] = None
     used_calendar_days: Optional[float] = None
+    accrued_work_override: Optional[float] = None
+    accrued_calendar_override: Optional[float] = None
 
 
 @router.patch("/api/admin/users/{user_id}")
@@ -214,9 +218,9 @@ async def api_user_update(user_id: int, payload: UserUpdate, current_user=Depend
         if parse_hire_date(data["hire_date"]) is None:
             raise HTTPException(status_code=400, detail="Дата приёма должна быть в формате ДД.ММ.ГГГГ")
 
-    for f in ("used_work_days", "used_calendar_days"):
+    for f in ("used_work_days", "used_calendar_days", "accrued_work_override", "accrued_calendar_override"):
         if f in data and data[f] is not None and data[f] < 0:
-            raise HTTPException(status_code=400, detail="Потраченные дни не могут быть отрицательными")
+            raise HTTPException(status_code=400, detail="Количество дней не может быть отрицательным")
 
     async with async_session() as session:
         db_user = await session.get(User, user_id)

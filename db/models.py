@@ -30,6 +30,12 @@ class User(Base):
     hire_date = Column(String, nullable=True)
     used_work_days = Column(Float, default=0)
     used_calendar_days = Column(Float, default=0)
+    # «Замороженное» начисление для сотрудников с нестандартным периодом
+    # (отпуск по уходу за ребёнком и т.п.): в кадровом Excel период начисления им
+    # обрезают вручную, из одной даты приёма это не вывести. Если задано —
+    # начисленные дни берутся отсюда и не растут, пока HR не обновит.
+    accrued_work_override = Column(Float, nullable=True)
+    accrued_calendar_override = Column(Float, nullable=True)
     # Доступ в веб-админку теперь даёт gateway (auth-service, роли/разрешения сервиса
     # hr_bot). Собственная авторизация админки удалена — поля login/password_hash больше
     # не нужны.
